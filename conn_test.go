@@ -13,6 +13,7 @@ import (
 	"github.com/posener/h2conn/http2test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/http2"
 )
 
 const (
@@ -62,10 +63,10 @@ func TestConcurrent(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, resp, err := Dial(context.Background(), server.URL, &tls.Config{InsecureSkipVerify: true})
+			client, resp, err := Dial(context.Background(), server.URL, OptTransport(&http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}))
 			require.Nil(t, err)
 
-			assert.Equal(t, http.StatusCreated, resp.StatusCode)
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 			var wg sync.WaitGroup
 			wg.Add(numRequests)

@@ -11,6 +11,7 @@ import (
 	"os/signal"
 
 	"github.com/posener/h2conn"
+	"golang.org/x/net/http2"
 )
 
 const url = "https://localhost:8000"
@@ -21,11 +22,11 @@ func main() {
 
 	go catchSignal(cancel)
 
-	client, resp, err := h2conn.Dial(ctx, url, &tls.Config{InsecureSkipVerify: true})
+	client, resp, err := h2conn.Dial(ctx, url, h2conn.OptTransport(&http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}))
 	if err != nil {
 		log.Fatalf("Initiate client: %s", err)
 	}
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		log.Fatalf("Bad status code: %d", resp.StatusCode)
 	}
 
