@@ -31,8 +31,8 @@ func main() {
 	fmt.Print("Name: ")
 	nameReader := bufio.NewReader(os.Stdin)
 	name, _ := nameReader.ReadString('\n')
-	client.Send <- []byte(name)
-	loginResp := <-client.Receive
+	client.Send() <- []byte(name)
+	loginResp := <-client.Recv()
 	if string(loginResp) != "ok" {
 		log.Fatalf("Failed login: %s", string(loginResp))
 	}
@@ -82,7 +82,7 @@ func main() {
 	ui.SetKeybinding("Esc", func() { ui.Quit() })
 
 	go func() {
-		for line := range client.Receive {
+		for line := range client.Recv() {
 			var post chat.Post
 			err = json.Unmarshal(line, &post)
 			if err != nil {

@@ -42,14 +42,14 @@ func main() {
 
 		// send message
 		select {
-		case client.Send <- []byte(msg):
+		case client.Send() <- []byte(msg):
 		case <-ctx.Done():
 			return
 		}
 
 		// receive message
 		select {
-		case resp := <-client.Receive:
+		case resp := <-client.Recv():
 			fmt.Printf("Got: %s\n", string(resp))
 		case <-ctx.Done():
 			return

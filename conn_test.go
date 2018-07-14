@@ -98,18 +98,18 @@ func TestConcurrent(t *testing.T) {
 }
 
 func serveWithChannel(conn *Conn) {
-	for msg := range conn.Receive {
-		conn.Send <- bytes.ToUpper(msg)
+	for msg := range conn.Recv() {
+		conn.Send() <- bytes.ToUpper(msg)
 	}
 }
 
 func clientSendWithChannel(t *testing.T, conn *Conn, msg []byte) {
-	conn.Send <- msg
+	conn.Send() <- msg
 }
 
 func clientRecWithChannel(t *testing.T, conn *Conn) []byte {
 	select {
-	case msg := <-conn.Receive:
+	case msg := <-conn.Recv():
 		return msg
 	case <-time.After(shortDuration):
 		t.Fatalf("Did not receive a response after %s", shortDuration)

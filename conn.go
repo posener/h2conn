@@ -8,28 +8,54 @@ import (
 )
 
 type Conn struct {
-	Send    chan<- []byte
-	Receive <-chan []byte
-	r       io.Reader
-	wc      io.WriteCloser
-	in      chan []byte
-	out     chan []byte
+	r   io.Reader
+	wc  io.WriteCloser
+	in  chan []byte
+	out chan []byte
 }
 
 func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser) *Conn {
 	in := make(chan []byte)
 	out := make(chan []byte)
 	c := &Conn{
-		r:       r,
-		wc:      wc,
-		in:      in,
-		out:     out,
-		Receive: in,
-		Send:    out,
+		r:   r,
+		wc:  wc,
+		in:  in,
+		out: out,
 	}
 
 	c.loop(ctx)
 	return c
+}
+
+func (c *Conn) Send() chan<- []byte {
+	return c.out
+}
+
+func (c *Conn) Recv() <-chan []byte {
+	return c.in
+}
+
+func (c *Conn) Write(data []byte) (int, error) {
+	n := len(data)
+	_, err := c.wc.Write(encode(data))
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
+func (c *Conn) Read(data []byte) (int, error) {
+	resp, ok := <-c.in
+	if !ok {
+		return 0, io.EOF
+	}
+	copy(data, resp)
+	return len(resp), nil
+}
+
+func (c *Conn) Close() error {
+	return c.wc.Close()
 }
 
 func (c *Conn) loop(ctx context.Context) {
@@ -63,26 +89,4 @@ func (c *Conn) loop(ctx context.Context) {
 			}
 		}
 	}()
-}
-
-func (c *Conn) Write(data []byte) (int, error) {
-	n := len(data)
-	_, err := c.wc.Write(encode(data))
-	if err != nil {
-		return 0, err
-	}
-	return n, nil
-}
-
-func (c *Conn) Read(data []byte) (int, error) {
-	resp, ok := <-c.in
-	if !ok {
-		return 0, io.EOF
-	}
-	copy(data, resp)
-	return len(resp), nil
-}
-
-func (c *Conn) Close() error {
-	return c.wc.Close()
 }

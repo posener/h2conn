@@ -31,7 +31,7 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nameBytes := <-conn.Receive
+	nameBytes := <-conn.Recv()
 	name := string(nameBytes)
 
 	log.Printf("New login: %s", name)
@@ -57,7 +57,7 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
-		case req := <-conn.Receive:
+		case req := <-conn.Recv():
 			err := c.post(name, req)
 			if err != nil {
 				log.Printf("Failed posting %q: %s", string(req), err)

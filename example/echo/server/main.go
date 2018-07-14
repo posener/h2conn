@@ -25,8 +25,8 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[%s] Joined", r.RemoteAddr)
 	defer log.Printf("[%s] Left", r.RemoteAddr)
-	for msg := range conn.Receive {
+	for msg := range conn.Recv() {
 		log.Printf("[%s] Sent: %s", r.RemoteAddr, string(msg))
-		conn.Send <- bytes.ToUpper(msg)
+		conn.Send() <- bytes.ToUpper(msg)
 	}
 }
