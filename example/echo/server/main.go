@@ -17,7 +17,7 @@ func main() {
 type server struct{}
 
 func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	conn, err := h2conn.New(w, r)
+	conn, err := h2conn.Upgrade(w, r)
 	if err != nil {
 		log.Printf("Failed creating connection from %s: %s", r.RemoteAddr, err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

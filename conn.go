@@ -7,6 +7,9 @@ import (
 	"log"
 )
 
+// Conn is client/server symmetric connection.
+// It implements the io.Reader/io.Writer/io.Closer to read/write or close the connection to the other side.
+// It also has a Send/Recv function to use channels to communicate with the other side.
 type Conn struct {
 	r   io.Reader
 	wc  io.WriteCloser
@@ -28,10 +31,12 @@ func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser) *Conn {
 	return c
 }
 
+// Send returns a send channel - messages that are sent into this channel will be sent to the other side.
 func (c *Conn) Send() chan<- []byte {
 	return c.out
 }
 
+// Recv returns a receive channel - messages that were sent from the other side will be received here.
 func (c *Conn) Recv() <-chan []byte {
 	return c.in
 }

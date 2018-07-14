@@ -24,7 +24,7 @@ type server struct {
 }
 
 func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	conn, err := h2conn.New(w, r)
+	conn, err := h2conn.Upgrade(w, r)
 	if err != nil {
 		log.Printf("Failed creating http2 connection: %s", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -34,7 +34,7 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	nameBytes := <-conn.Recv()
 	name := string(nameBytes)
 
-	log.Printf("New login: %s", name)
+	log.Printf("Upgrade login: %s", name)
 
 	err = c.login(name, conn)
 	if err != nil {

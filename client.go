@@ -20,24 +20,43 @@ type client struct {
 
 type clientOption func(*client)
 
+// OptHTTPMethod sets the HTTP method for the dial
+// The default method, if not set, is HTTP CONNECT.
 func OptHTTPMethod(method string) clientOption {
 	return func(c *client) {
 		c.method = method
 	}
 }
 
+// OptTransport sets a custom http2 transport for the connection
+// If set, the custom client will be ignored, and the default http client will be used with the
+// custom transport.
 func OptTransport(transport *http2.Transport) clientOption {
 	return func(c *client) {
 		c.transport = transport
 	}
 }
 
+// OptClient sets a custom http client.
+// Make sure to use an HTTP2 transport in this client.
 func OptClient(httpClient *http.Client) clientOption {
 	return func(c *client) {
 		c.httpClient = httpClient
 	}
 }
 
+// Dial dials an HTTP2 server to establish a full-duplex communication.
+//
+// Usage:
+//      conn, resp, err := h2conn.Dial(ctx, url, h2conn.OptTransport(&http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}))
+//      if err != nil {
+//          log.Fatalf("Initiate client: %s", err)
+//      }
+//      if resp.StatusCode != http.StatusOK {
+//          log.Fatalf("Bad status code: %d", resp.StatusCode)
+//      }
+//      defer conn.Close()
+//      // use conn
 func Dial(ctx context.Context, url string, opt ...clientOption) (*Conn, *http.Response, error) {
 	var cl = client{
 		method:     http.MethodConnect,

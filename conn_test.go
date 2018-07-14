@@ -53,7 +53,7 @@ func TestConcurrent(t *testing.T) {
 			serverDone := make(chan struct{})
 
 			server := http2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				conn, err := New(w, r)
+				conn, err := Upgrade(w, r)
 				if err != nil {
 					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 					return

@@ -22,16 +22,16 @@ func main() {
 
 	go catchSignal(cancel)
 
-	client, resp, err := h2conn.Dial(ctx, url, h2conn.OptTransport(&http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}))
+	conn, resp, err := h2conn.Dial(ctx, url, h2conn.OptTransport(&http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}))
 	if err != nil {
-		log.Fatalf("Initiate client: %s", err)
+		log.Fatalf("Initiate conn: %s", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		log.Fatalf("Bad status code: %d", resp.StatusCode)
 	}
 
 	// closing the login will logout
-	defer client.Close()
+	defer conn.Close()
 
 	reader := bufio.NewReader(os.Stdin)
 
@@ -42,14 +42,14 @@ func main() {
 
 		// send message
 		select {
-		case client.Send() <- []byte(msg):
+		case conn.Send() <- []byte(msg):
 		case <-ctx.Done():
 			return
 		}
 
 		// receive message
 		select {
-		case resp := <-client.Recv():
+		case resp := <-conn.Recv():
 			fmt.Printf("Got: %s\n", string(resp))
 		case <-ctx.Done():
 			return
