@@ -64,34 +64,46 @@ func (c *Conn) Close() error {
 }
 
 func (c *Conn) loop(ctx context.Context) {
-	go func() {
-		buf := bufio.NewReader(c.r)
-		defer close(c.in)
-		for ctx.Err() == nil {
-			line, prefix, err := buf.ReadLine()
-			if err != nil {
-				log.Printf("Failed read: %s", err)
-				return
-			}
-			// TODO: treat long lines
-			if prefix {
-				return
-			}
-			line = decode(line)
-			var cp = make([]byte, len(line))
-			copy(cp, line)
-			c.in <- cp
-		}
-	}()
+	go c.readLoop(ctx)
+	go c.writeLoop(ctx)
+}
 
-	go func() {
-		for {
-			select {
-			case msg := <-c.out:
-				c.Write(msg)
-			case <-ctx.Done():
+func (c *Conn) readLoop(ctx context.Context) {
+	// close the in channel when read loop finishes
+	defer close(c.in)
+
+	// buffer to enable read lines from the connection
+	buf := bufio.NewReader(c.r)
+
+	for ctx.Err() == nil {
+		line, prefix, err := buf.ReadLine()
+		if err != nil {
+			// TODO: store read error in the conn struct?
+			log.Printf("Failed read: %s", err)
+			return
+		}
+		if prefix {
+			// TODO: support long lines
+			log.Printf("Long lines not supported")
+			return
+		}
+		line = decode(line)
+		var cp = make([]byte, len(line))
+		copy(cp, line)
+		c.in <- cp
+	}
+}
+
+func (c *Conn) writeLoop(ctx context.Context) {
+	for {
+		select {
+		case msg, ok := <-c.out:
+			if !ok {
 				return
 			}
+			c.Write(msg)
+		case <-ctx.Done():
+			return
 		}
-	}()
+	}
 }
