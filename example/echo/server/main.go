@@ -1,9 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"log"
 	"net/http"
+
+	"encoding/json"
+
+	"fmt"
 
 	"github.com/posener/h2conn"
 )
@@ -23,10 +26,46 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	log.Printf("[%s] Joined", r.RemoteAddr)
-	defer log.Printf("[%s] Left", r.RemoteAddr)
-	for msg := range conn.Recv() {
-		log.Printf("[%s] Sent: %s", r.RemoteAddr, string(msg))
-		conn.Send() <- bytes.ToUpper(msg)
+	defer conn.Close()
+
+	// Conn has a RemoteAddr property which helps us identify the client
+	log := logger{remoteAddr: conn.RemoteAddr().String()}
+
+	log.Printf("Joined")
+	defer log.Printf("Left")
+
+	// Create a json encoder and decoder to send json messages over the connection
+	var (
+		in  = json.NewDecoder(conn)
+		out = json.NewEncoder(conn)
+	)
+
+	// Loop forever until the client hangs the connection, in which there will be an error
+	// in the decode or encode stages.
+	for {
+		var msg string
+		err = in.Decode(&msg)
+		if err != nil {
+			log.Printf("Failed decoding request: %v", err)
+			return
+		}
+
+		log.Printf("Got: %q", msg)
+
+		err = out.Encode(msg)
+		if err != nil {
+			log.Printf("Failed encoding response: %v", err)
+			return
+		}
+
+		log.Printf("Sent: %q", msg)
 	}
+}
+
+type logger struct {
+	remoteAddr string
+}
+
+func (l logger) Printf(format string, args ...interface{}) {
+	log.Printf("[%s] %s", l.remoteAddr, fmt.Sprintf(format, args...))
 }

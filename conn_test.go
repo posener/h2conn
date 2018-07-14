@@ -1,10 +1,12 @@
 package h2conn
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
 	"log"
+	"net"
 	"net/http"
 	"sync"
 	"testing"
@@ -14,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
+	"golang.org/x/net/nettest"
 )
 
 const (
@@ -24,125 +27,108 @@ const (
 func TestConcurrent(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name       string
-		serve      func(*Conn)
-		clientSend func(*testing.T, *Conn, []byte)
-		clientRec  func(*testing.T, *Conn) []byte
-	}{
-		{
-			name:       "channels",
-			serve:      serveWithChannel,
-			clientSend: clientSendWithChannel,
-			clientRec:  clientRecWithChannel,
-		},
-		{
-			name:       "read write",
-			serve:      serveWithReadWrite,
-			clientSend: clientSendWithWrite,
-			clientRec:  clientRecWithRead,
-		},
-	}
+	// serverDone indicates if the server finished serving the client after the client closed the connection
+	serverDone := make(chan struct{})
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			// serverDone indicates if the server finished serving the client after the client closed the connection
-			serverDone := make(chan struct{})
-
-			server := http2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				conn, err := Upgrade(w, r)
-				if err != nil {
-					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-					return
-				}
-				tt.serve(conn)
-				close(serverDone)
-			}))
-			defer server.Close()
-
-			client, resp, err := Dial(context.Background(), server.URL, OptTransport(&http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}))
-			require.Nil(t, err)
-
-			assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-			var wg sync.WaitGroup
-			wg.Add(numRequests)
-
-			go func() {
-				for i := 0; i < numRequests; i++ {
-					tt.clientSend(t, client, []byte("hello"))
-				}
-			}()
-
-			go func() {
-				for i := 0; i < numRequests; i++ {
-					msg := tt.clientRec(t, client)
-					assert.Equal(t, "HELLO", string(msg))
-					wg.Done()
-				}
-			}()
-			wg.Wait()
-
-			// test that server is closing the connection
-			client.Close()
-			select {
-			case <-serverDone:
-			case <-time.After(shortDuration):
-				t.Fatalf("Server not done after %s", shortDuration)
+	server := http2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := Upgrade(w, r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		buf := bufio.NewReader(conn)
+		for {
+			msg, _, err := buf.ReadLine()
+			if err != nil {
+				log.Printf("Server failed read: %s", err)
+				break
 			}
-		})
+
+			_, err = conn.Write(append(bytes.ToUpper(msg), '\n'))
+			if err != nil {
+				log.Printf("Server failed write: %s", err)
+				break
+			}
+		}
+		close(serverDone)
+	}))
+	defer server.Close()
+
+	d := &Dialer{
+		Client: &http.Client{
+			Transport: &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+		},
 	}
-}
 
-func serveWithChannel(conn *Conn) {
-	for msg := range conn.Recv() {
-		conn.Send() <- bytes.ToUpper(msg)
-	}
-}
+	client, resp, err := d.Dial(context.Background(), server.URL, nil)
+	require.Nil(t, err)
 
-func clientSendWithChannel(t *testing.T, conn *Conn, msg []byte) {
-	conn.Send() <- msg
-}
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-func clientRecWithChannel(t *testing.T, conn *Conn) []byte {
+	buf := bufio.NewReader(client)
+
+	var wg sync.WaitGroup
+	wg.Add(numRequests)
+
+	go func() {
+		for i := 0; i < numRequests; i++ {
+			_, err := client.Write([]byte("hello\n"))
+			require.Nil(t, err)
+		}
+	}()
+
+	go func() {
+		for i := 0; i < numRequests; i++ {
+			msg, _, err := buf.ReadLine()
+			require.Nil(t, err)
+			assert.Equal(t, "HELLO", string(msg))
+			wg.Done()
+		}
+	}()
+	wg.Wait()
+
+	// test that server is closing the connection
+	client.Close()
 	select {
-	case msg := <-conn.Recv():
-		return msg
+	case <-serverDone:
 	case <-time.After(shortDuration):
-		t.Fatalf("Did not receive a response after %s", shortDuration)
-	}
-	return nil
-}
-
-func serveWithReadWrite(conn *Conn) {
-	for {
-		msg := make([]byte, 100)
-		n, err := conn.Read(msg)
-		if err != nil {
-			log.Printf("Server failed read: %s", err)
-			break
-		}
-		msg = msg[:n]
-
-		_, err = conn.Write(bytes.ToUpper(msg))
-		if err != nil {
-			log.Printf("Server failed write: %s", err)
-			break
-		}
+		t.Fatalf("Server not done after %s", shortDuration)
 	}
 }
 
-func clientSendWithWrite(t *testing.T, conn *Conn, msg []byte) {
-	_, err := conn.Write(msg)
-	require.Nil(t, err)
+func TestConn(t *testing.T) {
+	t.Skip("Only TestConn/BasicIO and TestConn/PingPong are passing since there is no deadline support")
+	nettest.TestConn(t, func() (c1 net.Conn, c2 net.Conn, stop func(), err error) {
+		c1, c2, stop, err = makePipe(t)
+		return
+	})
 }
 
-func clientRecWithRead(t *testing.T, conn *Conn) []byte {
-	msg := make([]byte, 100)
-	n, err := conn.Read(msg)
+func makePipe(t *testing.T) (net.Conn, net.Conn, func(), error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	var serverConn *Conn
+
+	server := http2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		serverConn, err = Upgrade(w, r)
+		require.Nil(t, err)
+		<-serverConn.Done()
+	}))
+
+	d := &Dialer{
+		Client: &http.Client{
+			Transport: &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+		},
+	}
+
+	clientConn, resp, err := d.Dial(ctx, server.URL, nil)
 	require.Nil(t, err)
-	return msg[:n]
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	stop := func() {
+		server.Close()
+		cancel()
+	}
+
+	return serverConn, clientConn, stop, nil
 }

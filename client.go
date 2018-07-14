@@ -8,47 +8,28 @@ import (
 	"golang.org/x/net/http2"
 )
 
-var DefaultClient = &http.Client{
-	Transport: &http2.Transport{},
+type Dialer struct {
+	// Method sets the HTTP method for the dial
+	// The default method, if not set, is HTTP CONNECT.
+	Method string
+	Client *http.Client
 }
 
-type client struct {
-	method     string
-	transport  *http2.Transport
-	httpClient *http.Client
+var defaultDialer = Dialer{
+	Method: http.MethodConnect,
+	Client: &http.Client{Transport: &http2.Transport{}},
 }
 
-type clientOption func(*client)
-
-// OptHTTPMethod sets the HTTP method for the dial
-// The default method, if not set, is HTTP CONNECT.
-func OptHTTPMethod(method string) clientOption {
-	return func(c *client) {
-		c.method = method
-	}
-}
-
-// OptTransport sets a custom http2 transport for the connection
-// If set, the custom client will be ignored, and the default http client will be used with the
-// custom transport.
-func OptTransport(transport *http2.Transport) clientOption {
-	return func(c *client) {
-		c.transport = transport
-	}
-}
-
-// OptClient sets a custom http client.
-// Make sure to use an HTTP2 transport in this client.
-func OptClient(httpClient *http.Client) clientOption {
-	return func(c *client) {
-		c.httpClient = httpClient
-	}
+func Dial(ctx context.Context, urlStr string, header http.Header) (*Conn, *http.Response, error) {
+	return defaultDialer.Dial(ctx, urlStr, header)
 }
 
 // Dial dials an HTTP2 server to establish a full-duplex communication.
+// Similar API to the net.DialContext function.
 //
 // Usage:
-//      conn, resp, err := h2conn.Dial(ctx, url, h2conn.OptTransport(&http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}))
+//
+//      conn, resp, err := h2conn.Dial(ctx, url)
 //      if err != nil {
 //          log.Fatalf("Initiate client: %s", err)
 //      }
@@ -56,33 +37,27 @@ func OptClient(httpClient *http.Client) clientOption {
 //          log.Fatalf("Bad status code: %d", resp.StatusCode)
 //      }
 //      defer conn.Close()
+//
 //      // use conn
-func Dial(ctx context.Context, url string, opt ...clientOption) (*Conn, *http.Response, error) {
-	var cl = client{
-		method:     http.MethodConnect,
-		httpClient: DefaultClient,
-	}
-	for _, mod := range opt {
-		mod(&cl)
-	}
-
-	if cl.transport != nil {
-		cl.httpClient = &http.Client{Transport: cl.transport}
-	}
-
+//
+func (d *Dialer) Dial(ctx context.Context, urlStr string, header http.Header) (*Conn, *http.Response, error) {
 	pr, pw := io.Pipe()
-	req, err := http.NewRequest(cl.method, url, pr)
+	req, err := http.NewRequest(d.Method, urlStr, pr)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if header != nil {
+		req.Header = header
 	}
 
 	// apply given context to the sent request
 	req = req.WithContext(ctx)
 
-	resp, err := cl.httpClient.Do(req)
+	resp, err := d.Client.Do(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return newConn(req.Context(), resp.Body, pw), resp, nil
+	return newConn(req.Context(), resp.Body, pw, resp.Request.RemoteAddr, req.Host), resp, nil
 }

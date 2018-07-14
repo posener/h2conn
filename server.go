@@ -8,17 +8,16 @@ import (
 
 var ErrHttp2NotSupported = fmt.Errorf("HTTP2 not supported")
 
-type server struct {
-	statusCode int
+type Upgrader struct {
+	StatusCode int
 }
 
-type serverOption func(*server)
+var defaultUpgrader = Upgrader{
+	StatusCode: http.StatusOK,
+}
 
-// OptStatusCode sets the status code that the server returns to the client if upgrade was successful.
-func OptStatusCode(statusCode int) serverOption {
-	return func(s *server) {
-		s.statusCode = statusCode
-	}
+func Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error) {
+	return defaultUpgrader.Upgrade(w, r)
 }
 
 // Upgrade is used on a server http.Handler.
@@ -37,22 +36,21 @@ func OptStatusCode(statusCode int) serverOption {
 //	        }
 //          // use conn
 //      }
-func Upgrade(w http.ResponseWriter, r *http.Request, opt ...serverOption) (*Conn, error) {
-	srv := server{
-		statusCode: http.StatusOK,
-	}
-	for _, mod := range opt {
-		mod(&srv)
-	}
+func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return nil, ErrHttp2NotSupported
 	}
 
-	c := newConn(r.Context(), r.Body, &writer{w: w, f: flusher})
+	//clientClosed, ok := w.(http.CloseNotifier)
+	//if !ok {
+	//	return nil, ErrHttp2NotSupported
+	//}
 
-	w.WriteHeader(srv.statusCode)
+	c := newConn(r.Context(), r.Body, &writer{w: w, f: flusher}, r.Host, r.RemoteAddr)
+
+	w.WriteHeader(u.StatusCode)
 	flusher.Flush()
 
 	return c, nil

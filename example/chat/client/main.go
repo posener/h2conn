@@ -11,6 +11,8 @@ import (
 	"os"
 	"time"
 
+	"strings"
+
 	"github.com/marcusolsson/tui-go"
 	"github.com/posener/h2conn"
 	"github.com/posener/h2conn/example/chat"
@@ -20,10 +22,22 @@ import (
 const url = "https://localhost:8000"
 
 func main() {
-	client, resp, err := h2conn.Dial(context.Background(), url, h2conn.OptTransport(&http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}))
-	if err != nil {
-		log.Fatalf("Initiate client: %s", err)
+	ctx := context.Background()
+
+	// We use a client with custom http2.Transport since the server certificate is not signed by
+	// an authorized CA, and this is the way to ignore certificate verification errors.
+	d := &h2conn.Dialer{
+		Client: &http.Client{
+			Transport: &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+		},
 	}
+	conn, resp, err := d.Dial(ctx, url, nil)
+	if err != nil {
+		log.Fatalf("Initiate conn: %s", err)
+	}
+	defer conn.Close()
+
+	// Check server status code
 	if resp.StatusCode != http.StatusOK {
 		log.Fatalf("Bad status code: %d", resp.StatusCode)
 	}
@@ -31,14 +45,29 @@ func main() {
 	fmt.Print("Name: ")
 	nameReader := bufio.NewReader(os.Stdin)
 	name, _ := nameReader.ReadString('\n')
-	client.Send() <- []byte(name)
-	loginResp := <-client.Recv()
-	if string(loginResp) != "ok" {
-		log.Fatalf("Failed login: %s", string(loginResp))
+	name = strings.TrimRight(name, "\n")
+
+	var (
+		// in and out send and receive json messages to the server
+		in  = json.NewDecoder(conn)
+		out = json.NewEncoder(conn)
+	)
+
+	// Send login request
+	err = out.Encode(name)
+	if err != nil {
+		log.Fatalf("Failed send login name: %v", err)
 	}
 
-	// closing the login will logout
-	defer client.Close()
+	// Check login response
+	var loginResp string
+	err = in.Decode(&loginResp)
+	if err != nil {
+		log.Fatalf("Failed login: %v", err)
+	}
+	if loginResp != "ok" {
+		log.Fatalf("Failed login: %s", loginResp)
+	}
 
 	history := tui.NewVBox()
 
@@ -61,16 +90,12 @@ func main() {
 
 	input.OnSubmit(func(e *tui.Entry) {
 		if e.Text() == "" {
-			return
+			return // Skip empty messages
 		}
-		body, err := json.Marshal(chat.Post{
-			Message: e.Text(),
-			Time:    time.Now(),
-		})
+		err := out.Encode(chat.Post{Message: e.Text(), Time: time.Now()})
 		if err != nil {
-			log.Fatalf("Failed marshalling message: %s", err)
+			log.Fatalf("Failed sending message: %v", err)
 		}
-		client.Write(body)
 		input.SetText("")
 	})
 
@@ -82,14 +107,14 @@ func main() {
 	ui.SetKeybinding("Esc", func() { ui.Quit() })
 
 	go func() {
-		for line := range client.Recv() {
+		for {
 			var post chat.Post
-			err = json.Unmarshal(line, &post)
+			err = in.Decode(&post)
 			if err != nil {
-				log.Fatalf("Failed unmarshaling %s %s", string(line), err)
+				log.Fatalf("Failed decoding incoming message %v", err)
 			}
 			history.Append(tui.NewHBox(
-				tui.NewLabel(post.Time.String()),
+				tui.NewLabel(post.Time.Format(time.Kitchen)),
 				tui.NewPadder(1, 0, tui.NewLabel(fmt.Sprintf("<%s>", post.User))),
 				tui.NewLabel(post.Message),
 				tui.NewSpacer(),

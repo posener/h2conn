@@ -1,109 +1,105 @@
 package h2conn
 
 import (
-	"bufio"
 	"context"
+	"fmt"
 	"io"
-	"log"
+	"net"
+	"strconv"
+	"sync"
+	"time"
 )
 
 // Conn is client/server symmetric connection.
 // It implements the io.Reader/io.Writer/io.Closer to read/write or close the connection to the other side.
 // It also has a Send/Recv function to use channels to communicate with the other side.
 type Conn struct {
-	r   io.Reader
-	wc  io.WriteCloser
-	in  chan []byte
-	out chan []byte
+	r  io.Reader
+	wc io.WriteCloser
+
+	// addresses
+	local, remote net.TCPAddr
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	wLock sync.Mutex
+	rLock sync.Mutex
 }
 
-func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser) *Conn {
-	in := make(chan []byte)
-	out := make(chan []byte)
+func (c *Conn) Done() <-chan struct{} {
+	return c.ctx.Done()
+}
+
+func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser, local, remote string) *Conn {
+	ctx, cancel := context.WithCancel(ctx)
+
 	c := &Conn{
-		r:   r,
-		wc:  wc,
-		in:  in,
-		out: out,
+		r:  r,
+		wc: wc,
+
+		ctx:    ctx,
+		cancel: cancel,
+
+		local:  netAddr(local),
+		remote: netAddr(remote),
 	}
 
-	c.loop(ctx)
+	if deadline, ok := ctx.Deadline(); ok {
+		c.SetDeadline(deadline)
+	}
+
 	return c
 }
 
-// Send returns a send channel - messages that are sent into this channel will be sent to the other side.
-func (c *Conn) Send() chan<- []byte {
-	return c.out
-}
-
-// Recv returns a receive channel - messages that were sent from the other side will be received here.
-func (c *Conn) Recv() <-chan []byte {
-	return c.in
-}
-
 func (c *Conn) Write(data []byte) (int, error) {
-	n := len(data)
-	_, err := c.wc.Write(encode(data))
-	if err != nil {
-		return 0, err
-	}
-	return n, nil
+	c.wLock.Lock()
+	defer c.wLock.Unlock()
+	return c.wc.Write(data)
 }
 
 func (c *Conn) Read(data []byte) (int, error) {
-	resp, ok := <-c.in
-	if !ok {
-		return 0, io.EOF
-	}
-	copy(data, resp)
-	return len(resp), nil
+	c.rLock.Lock()
+	defer c.rLock.Unlock()
+	return c.r.Read(data)
 }
 
 func (c *Conn) Close() error {
+	c.cancel()
 	return c.wc.Close()
 }
 
-func (c *Conn) loop(ctx context.Context) {
-	go c.readLoop(ctx)
-	go c.writeLoop(ctx)
+func (c *Conn) LocalAddr() net.Addr {
+	return &c.local
 }
 
-func (c *Conn) readLoop(ctx context.Context) {
-	// close the in channel when read loop finishes
-	defer close(c.in)
+func (c *Conn) RemoteAddr() net.Addr {
+	return &c.remote
+}
 
-	// buffer to enable read lines from the connection
-	buf := bufio.NewReader(c.r)
+func (c *Conn) SetDeadline(t time.Time) error {
+	return fmt.Errorf("deadline not supported")
+}
 
-	for ctx.Err() == nil {
-		line, prefix, err := buf.ReadLine()
-		if err != nil {
-			// TODO: store read error in the conn struct?
-			log.Printf("Failed read: %s", err)
-			return
-		}
-		if prefix {
-			// TODO: support long lines
-			log.Printf("Long lines not supported")
-			return
-		}
-		line = decode(line)
-		var cp = make([]byte, len(line))
-		copy(cp, line)
-		c.in <- cp
+func (c *Conn) SetReadDeadline(t time.Time) error {
+	return fmt.Errorf("deadline not supported")
+}
+
+func (c *Conn) SetWriteDeadline(t time.Time) error {
+	return fmt.Errorf("deadline not supported")
+}
+
+func netAddr(addr string) net.TCPAddr {
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = "0.0.0.0"
 	}
-}
-
-func (c *Conn) writeLoop(ctx context.Context) {
-	for {
-		select {
-		case msg, ok := <-c.out:
-			if !ok {
-				return
-			}
-			c.Write(msg)
-		case <-ctx.Done():
-			return
-		}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		port = 80
+	}
+	return net.TCPAddr{
+		IP:   net.ParseIP(host),
+		Port: port,
 	}
 }
