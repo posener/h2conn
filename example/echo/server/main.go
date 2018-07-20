@@ -22,7 +22,7 @@ func main() {
 type handler struct{}
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	conn, err := h2conn.Upgrade(w, r)
+	conn, err := h2conn.Accept(w, r)
 	if err != nil {
 		log.Printf("Failed creating connection from %s: %s", r.RemoteAddr, err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -31,7 +31,7 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	// Conn has a RemoteAddr property which helps us identify the client
-	log := logger{remoteAddr: conn.RemoteAddr().String()}
+	log := logger{remoteAddr: r.RemoteAddr}
 
 	log.Printf("Joined")
 	defer log.Printf("Left")

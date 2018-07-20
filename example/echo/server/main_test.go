@@ -22,12 +22,12 @@ func TestHandler(t *testing.T) {
 
 	// We use a client with custom http2.Transport since the server certificate is not signed by
 	// an authorized CA, and this is the way to ignore certificate verification errors.
-	d := &h2conn.Dialer{
+	d := &h2conn.Client{
 		Client: &http.Client{
 			Transport: &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
 		},
 	}
-	conn, resp, err := d.Dial(context.Background(), server.URL, nil)
+	conn, resp, err := d.Connect(context.Background(), server.URL)
 	require.NoError(t, err)
 
 	defer conn.Close()

@@ -6,26 +6,26 @@ import (
 	"net/http"
 )
 
-// ErrHTTP2NotSupported is returned by Upgrade if the client connection does not
+// ErrHTTP2NotSupported is returned by Accept if the client connection does not
 // support HTTP2 connection.
 // The server than can response to the client with an HTTP1.1 as he wishes.
 var ErrHTTP2NotSupported = fmt.Errorf("HTTP2 not supported")
 
-// Upgrader can "upgrade" an http2 connection to obtain a net.Conn object
+// Server can "accept" an http2 connection to obtain a read/write object
 // for full duplex communication with a client.
-type Upgrader struct {
+type Server struct {
 	StatusCode int
 }
 
-var defaultUpgrader = Upgrader{
+var defaultUpgrader = Server{
 	StatusCode: http.StatusOK,
 }
 
-func Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error) {
-	return defaultUpgrader.Upgrade(w, r)
+func Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
+	return defaultUpgrader.Accept(w, r)
 }
 
-// Upgrade is used on a server http.Handler.
+// Accept is used on a server http.Handler.
 // It handles a request and "upgrade" the request connection to a websocket-like
 // full-duplex communication.
 // If the client does not support HTTP2, an ErrHTTP2NotSupported is returned.
@@ -33,7 +33,7 @@ func Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 // Usage:
 //
 //      func (w http.ResponseWriter, r *http.Request) {
-//          conn, err := h2conn.Upgrade(w, r)
+//          conn, err := h2conn.Accept(w, r)
 //          if err != nil {
 //		        log.Printf("Failed creating http2 connection: %s", err)
 //		        http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -41,14 +41,14 @@ func Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 //	        }
 //          // use conn
 //      }
-func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error) {
+func (u *Server) Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return nil, ErrHTTP2NotSupported
 	}
 
-	c := newConn(r.Context(), r.Body, &flushWrite{w: w, f: flusher}, r.Host, r.RemoteAddr)
+	c := newConn(r.Context(), r.Body, &flushWrite{w: w, f: flusher})
 
 	w.WriteHeader(u.StatusCode)
 	flusher.Flush()

@@ -25,7 +25,7 @@ type server struct {
 }
 
 func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	conn, err := h2conn.Upgrade(w, r)
+	conn, err := h2conn.Accept(w, r)
 	if err != nil {
 		log.Printf("Failed creating http2 connection: %s", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -34,7 +34,7 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	// Conn has a RemoteAddr property which helps us identify the client
-	log := logger{remoteAddr: conn.RemoteAddr().String()}
+	log := logger{remoteAddr: r.RemoteAddr}
 
 	var (
 		// in and out send and receive json messages to the server

@@ -26,13 +26,13 @@ func main() {
 
 	// We use a client with custom http2.Transport since the server certificate is not signed by
 	// an authorized CA, and this is the way to ignore certificate verification errors.
-	d := &h2conn.Dialer{
+	d := &h2conn.Client{
 		Client: &http.Client{
 			Transport: &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
 		},
 	}
 
-	conn, resp, err := d.Dial(ctx, url, nil)
+	conn, resp, err := d.Connect(ctx, url)
 	if err != nil {
 		log.Fatalf("Initiate conn: %s", err)
 	}
