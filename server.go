@@ -43,11 +43,6 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error
 		return nil, ErrHttp2NotSupported
 	}
 
-	//clientClosed, ok := w.(http.CloseNotifier)
-	//if !ok {
-	//	return nil, ErrHttp2NotSupported
-	//}
-
 	c := newConn(r.Context(), r.Body, &writer{w: w, f: flusher}, r.Host, r.RemoteAddr)
 
 	w.WriteHeader(u.StatusCode)

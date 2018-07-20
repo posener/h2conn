@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"sync"
-
 	"time"
 
 	"github.com/posener/h2conn"

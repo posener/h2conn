@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/posener/h2conn/http2test"
+	"github.com/posener/h2conn/h2test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
@@ -30,7 +30,7 @@ func TestConcurrent(t *testing.T) {
 	// serverDone indicates if the server finished serving the client after the client closed the connection
 	serverDone := make(chan struct{})
 
-	server := http2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := Upgrade(w, r)
 		if err != nil {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -108,7 +108,7 @@ func makePipe(t *testing.T) (net.Conn, net.Conn, func(), error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var serverConn *Conn
 
-	server := http2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
 		serverConn, err = Upgrade(w, r)
 		require.Nil(t, err)
