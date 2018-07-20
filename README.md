@@ -2,6 +2,11 @@
 
 `h2conn` is an HTTP2 client-server connection, similar to websockets but over HTTP2.
 
+[![Build Status](https://travis-ci.org/posener/h2conn.svg?branch=master)](https://travis-ci.org/posener/h2conn)
+[![codecov](https://codecov.io/gh/posener/h2conn/branch/master/graph/badge.svg)](https://codecov.io/gh/posener/h2conn)
+[![GoDoc](https://godoc.org/github.com/posener/h2conn?status.svg)](http://godoc.org/github.com/posener/h2conn)
+[![Go Report Card](https://goreportcard.com/badge/github.com/posener/h2conn)](https://goreportcard.com/report/github.com/posener/h2conn)
+
 Get an implementation of [`net.Conn`](https://godoc.org/net#Conn) on both the client and server sides from
 an HTTP2 connection, For easy, full-duplex communication.
 
