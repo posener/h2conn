@@ -17,7 +17,7 @@ import (
 func TestHandler(t *testing.T) {
 	t.Parallel()
 
-	server := h2test.NewServer(handler{})
+	server := h2test.NewServer(Handler{})
 	defer server.Close()
 
 	// We use a client with custom http2.Transport since the server certificate is not signed by
@@ -43,5 +43,5 @@ func TestHandler(t *testing.T) {
 	err = in.Decode(&msg)
 	require.NoError(t, err)
 
-	assert.Equal(t, "hello", msg)
+	assert.Equal(t, "HELLO", msg)
 }

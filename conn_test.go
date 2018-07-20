@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"os"
+
 	"github.com/posener/h2conn/h2test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,19 +26,23 @@ const (
 	shortDuration = 100 * time.Millisecond
 )
 
+// TestConcurrent runs a simple test of concurrent reads and writes on an HTTP2 full duplex connection
 func TestConcurrent(t *testing.T) {
 	t.Parallel()
 
-	// serverDone indicates if the server finished serving the client after the client closed the connection
-	serverDone := make(chan struct{})
+	var serverConn *Conn
 
 	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := Upgrade(w, r)
+		var err error
+		serverConn, err = Upgrade(w, r)
 		if err != nil {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
-		buf := bufio.NewReader(conn)
+		defer serverConn.Close()
+
+		// simple read loop that echos the upper case of what was read.
+		buf := bufio.NewReader(serverConn)
 		for {
 			msg, _, err := buf.ReadLine()
 			if err != nil {
@@ -44,13 +50,12 @@ func TestConcurrent(t *testing.T) {
 				break
 			}
 
-			_, err = conn.Write(append(bytes.ToUpper(msg), '\n'))
+			_, err = serverConn.Write(append(bytes.ToUpper(msg), '\n'))
 			if err != nil {
 				log.Printf("Server failed write: %s", err)
 				break
 			}
 		}
-		close(serverDone)
 	}))
 	defer server.Close()
 
@@ -60,19 +65,19 @@ func TestConcurrent(t *testing.T) {
 		},
 	}
 
-	client, resp, err := d.Dial(context.Background(), server.URL, nil)
+	clientConn, resp, err := d.Dial(context.Background(), server.URL, nil)
 	require.Nil(t, err)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	buf := bufio.NewReader(client)
+	buf := bufio.NewReader(clientConn)
 
 	var wg sync.WaitGroup
 	wg.Add(numRequests)
 
 	go func() {
 		for i := 0; i < numRequests; i++ {
-			_, err := client.Write([]byte("hello\n"))
+			_, err := clientConn.Write([]byte("hello\n"))
 			require.Nil(t, err)
 		}
 	}()
@@ -88,21 +93,23 @@ func TestConcurrent(t *testing.T) {
 	wg.Wait()
 
 	// test that server is closing the connection
-	client.Close()
+	clientConn.Close()
 	select {
-	case <-serverDone:
+	case <-serverConn.Done():
 	case <-time.After(shortDuration):
 		t.Fatalf("Server not done after %s", shortDuration)
 	}
 }
 
+// TestConn runs the nettest.TestConn on a pipe between an HTTP2 server and client
 func TestConn(t *testing.T) {
 	// Only TestConn/BasicIO and TestConn/PingPong currently pass
 	// as they don't test deadlines.
-	// In order to run the tests:
-	// 		1. comment out the `t.Skip(...)` line
-	// 		2. run `go test -race -v -run "TestConn/(BasicIO|PingPong)"`
-	t.Skip("Only TestConn/BasicIO and TestConn/PingPong are passing since there is no deadline support")
+	// In order to run the tests run:
+	// `TEST_CONN=1 go test -race -v -run "TestConn/(BasicIO|PingPong)"`
+	if os.Getenv("TEST_CONN") == "" {
+		t.Skip("Only TestConn/BasicIO and TestConn/PingPong are passing since there is no deadline support")
+	}
 	nettest.TestConn(t, func() (c1 net.Conn, c2 net.Conn, stop func(), err error) {
 		c1, c2, stop, err = makePipe(t)
 		return

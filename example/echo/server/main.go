@@ -8,18 +8,20 @@ import (
 
 	"fmt"
 
+	"strings"
+
 	"github.com/posener/h2conn"
 )
 
 func main() {
-	srv := &http.Server{Addr: ":8000", Handler: handler{}}
+	srv := &http.Server{Addr: ":8000", Handler: Handler{}}
 	log.Printf("Serving on http://0.0.0.0:8000")
 	log.Fatal(srv.ListenAndServeTLS("server.crt", "server.key"))
 }
 
-type handler struct{}
+type Handler struct{}
 
-func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := h2conn.Upgrade(w, r)
 	if err != nil {
 		log.Printf("Failed creating connection from %s: %s", r.RemoteAddr, err)
@@ -51,6 +53,8 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		log.Printf("Got: %q", msg)
+
+		msg = strings.ToUpper(msg)
 
 		err = out.Encode(msg)
 		if err != nil {
