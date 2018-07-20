@@ -17,7 +17,7 @@ import (
 func TestHandler(t *testing.T) {
 	t.Parallel()
 
-	server := h2test.NewServer(Handler{})
+	server := h2test.NewServer(handler{})
 	defer server.Close()
 
 	// We use a client with custom http2.Transport since the server certificate is not signed by

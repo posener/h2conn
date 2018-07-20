@@ -27,6 +27,7 @@ type Conn struct {
 	rLock sync.Mutex
 }
 
+// Done returns a channel that is closed when the other side closes the connection.
 func (c *Conn) Done() <-chan struct{} {
 	return c.ctx.Done()
 }
@@ -52,39 +53,50 @@ func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser, local, remote 
 	return c
 }
 
+// Write writes data to the connection
 func (c *Conn) Write(data []byte) (int, error) {
 	c.wLock.Lock()
 	defer c.wLock.Unlock()
 	return c.wc.Write(data)
 }
 
+// Read reads data from the connection
 func (c *Conn) Read(data []byte) (int, error) {
 	c.rLock.Lock()
 	defer c.rLock.Unlock()
 	return c.r.Read(data)
 }
 
+// Close closes the connection
 func (c *Conn) Close() error {
 	c.cancel()
 	return c.wc.Close()
 }
 
+// LocalAddr returns the address of the local side of the connection
 func (c *Conn) LocalAddr() net.Addr {
 	return &c.local
 }
 
+// LocalAddr returns the address of the remote side of the connection
 func (c *Conn) RemoteAddr() net.Addr {
 	return &c.remote
 }
 
+// SetDeadLine sets read/write deadlines for the connection
+// it is currently not supported
 func (c *Conn) SetDeadline(t time.Time) error {
 	return fmt.Errorf("deadline not supported")
 }
 
+// SetReadDeadLine sets read deadline for the connection
+// it is currently not supported
 func (c *Conn) SetReadDeadline(t time.Time) error {
 	return fmt.Errorf("deadline not supported")
 }
 
+// SetWriteDeadLine sets write deadline for the connection
+// it is currently not supported
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return fmt.Errorf("deadline not supported")
 }

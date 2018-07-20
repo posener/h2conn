@@ -14,14 +14,14 @@ import (
 )
 
 func main() {
-	srv := &http.Server{Addr: ":8000", Handler: Handler{}}
+	srv := &http.Server{Addr: ":8000", Handler: handler{}}
 	log.Printf("Serving on http://0.0.0.0:8000")
 	log.Fatal(srv.ListenAndServeTLS("server.crt", "server.key"))
 }
 
-type Handler struct{}
+type handler struct{}
 
-func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := h2conn.Upgrade(w, r)
 	if err != nil {
 		log.Printf("Failed creating connection from %s: %s", r.RemoteAddr, err)

@@ -2,6 +2,7 @@ package chat
 
 import "time"
 
+// Post is a chat post
 type Post struct {
 	User    string
 	Message string
