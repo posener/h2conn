@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -16,9 +14,6 @@ import (
 type Conn struct {
 	r  io.Reader
 	wc io.WriteCloser
-
-	// addresses
-	local, remote net.TCPAddr
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -32,7 +27,7 @@ func (c *Conn) Done() <-chan struct{} {
 	return c.ctx.Done()
 }
 
-func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser, local, remote string) *Conn {
+func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser) *Conn {
 	ctx, cancel := context.WithCancel(ctx)
 
 	c := &Conn{
@@ -41,13 +36,6 @@ func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser, local, remote 
 
 		ctx:    ctx,
 		cancel: cancel,
-
-		local:  netAddr(local),
-		remote: netAddr(remote),
-	}
-
-	if deadline, ok := ctx.Deadline(); ok {
-		c.SetDeadline(deadline)
 	}
 
 	return c
@@ -73,45 +61,8 @@ func (c *Conn) Close() error {
 	return c.wc.Close()
 }
 
-// LocalAddr returns the address of the local side of the connection
-func (c *Conn) LocalAddr() net.Addr {
-	return &c.local
-}
-
-// LocalAddr returns the address of the remote side of the connection
-func (c *Conn) RemoteAddr() net.Addr {
-	return &c.remote
-}
-
-// SetDeadLine sets read/write deadlines for the connection
-// it is currently not supported
-func (c *Conn) SetDeadline(t time.Time) error {
-	return fmt.Errorf("deadline not supported")
-}
-
-// SetReadDeadLine sets read deadline for the connection
-// it is currently not supported
-func (c *Conn) SetReadDeadline(t time.Time) error {
-	return fmt.Errorf("deadline not supported")
-}
-
 // SetWriteDeadLine sets write deadline for the connection
 // it is currently not supported
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return fmt.Errorf("deadline not supported")
-}
-
-func netAddr(addr string) net.TCPAddr {
-	host, portStr, err := net.SplitHostPort(addr)
-	if err != nil {
-		host = "0.0.0.0"
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		port = 80
-	}
-	return net.TCPAddr{
-		IP:   net.ParseIP(host),
-		Port: port,
-	}
 }

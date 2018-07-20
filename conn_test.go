@@ -34,7 +34,7 @@ func TestConcurrent(t *testing.T) {
 
 	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
-		serverConn, err = Upgrade(w, r)
+		serverConn, err = Accept(w, r)
 		if err != nil {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
@@ -59,13 +59,13 @@ func TestConcurrent(t *testing.T) {
 	}))
 	defer server.Close()
 
-	d := &Dialer{
+	d := &Client{
 		Client: &http.Client{
 			Transport: &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
 		},
 	}
 
-	clientConn, resp, err := d.Dial(context.Background(), server.URL, nil)
+	clientConn, resp, err := d.Connect(context.Background(), server.URL)
 	require.Nil(t, err)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -122,18 +122,18 @@ func makePipe(t *testing.T) (net.Conn, net.Conn, func(), error) {
 
 	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
-		serverConn, err = Upgrade(w, r)
+		serverConn, err = Accept(w, r)
 		require.Nil(t, err)
 		<-serverConn.Done()
 	}))
 
-	d := &Dialer{
+	d := &Client{
 		Client: &http.Client{
 			Transport: &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
 		},
 	}
 
-	clientConn, resp, err := d.Dial(ctx, server.URL, nil)
+	clientConn, resp, err := d.Connect(ctx, server.URL)
 	require.Nil(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -142,5 +142,30 @@ func makePipe(t *testing.T) (net.Conn, net.Conn, func(), error) {
 		cancel()
 	}
 
-	return serverConn, clientConn, stop, nil
+	return connWrapper{Conn: serverConn}, connWrapper{Conn: clientConn}, stop, nil
 }
+
+type connWrapper struct {
+	*Conn
+}
+
+func (c connWrapper) LocalAddr() net.Addr {
+	return mockAddr{}
+}
+
+func (c connWrapper) RemoteAddr() net.Addr {
+	return mockAddr{}
+}
+
+func (c connWrapper) SetDeadline(t time.Time) error {
+	panic("not implemented")
+}
+
+func (c connWrapper) SetReadDeadline(t time.Time) error {
+	panic("not implemented")
+}
+
+type mockAddr struct{}
+
+func (mockAddr) Network() string { return "mock" }
+func (mockAddr) String() string  { return "mock" }

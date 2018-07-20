@@ -8,31 +8,32 @@ import (
 	"golang.org/x/net/http2"
 )
 
-// Dialer enables dial with special arguments
-type Dialer struct {
+// Client provides HTTP2 client side connection with special arguments
+type Client struct {
 	// Method sets the HTTP method for the dial
 	// The default method, if not set, is HTTP CONNECT.
 	Method string
+	// Header enables sending custom headers to the server
+	Header http.Header
 	// Client is a custom HTTP client to be used for the connection.
 	// The client must have an http2.Transport as it's transport.
 	Client *http.Client
 }
 
-var defaultDialer = Dialer{
+var defaultClient = Client{
 	Method: http.MethodConnect,
 	Client: &http.Client{Transport: &http2.Transport{}},
 }
 
-func Dial(ctx context.Context, urlStr string, header http.Header) (*Conn, *http.Response, error) {
-	return defaultDialer.Dial(ctx, urlStr, header)
+func Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) {
+	return defaultClient.Connect(ctx, urlStr)
 }
 
-// Dial dials an HTTP2 server to establish a full-duplex communication.
-// Similar API to the net.DialContext function.
+// Connect establishes a full duplex communication with an HTTP2 server.
 //
 // Usage:
 //
-//      conn, resp, err := h2conn.Dial(ctx, url)
+//      conn, resp, err := h2conn.Connect(ctx, url)
 //      if err != nil {
 //          log.Fatalf("Initiate client: %s", err)
 //      }
@@ -43,15 +44,18 @@ func Dial(ctx context.Context, urlStr string, header http.Header) (*Conn, *http.
 //
 //      // use conn
 //
-func (d *Dialer) Dial(ctx context.Context, urlStr string, header http.Header) (*Conn, *http.Response, error) {
+func (d *Client) Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) {
 	pr, pw := io.Pipe()
+
+	// Create a request object to send to the server
 	req, err := http.NewRequest(d.Method, urlStr, pr)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if header != nil {
-		req.Header = header
+	// Apply custom headers
+	if d.Header != nil {
+		req.Header = d.Header
 	}
 
 	// apply given context to the sent request
@@ -62,5 +66,5 @@ func (d *Dialer) Dial(ctx context.Context, urlStr string, header http.Header) (*
 		return nil, nil, err
 	}
 
-	return newConn(req.Context(), resp.Body, pw, resp.Request.RemoteAddr, req.Host), resp, nil
+	return newConn(req.Context(), resp.Body, pw), resp, nil
 }

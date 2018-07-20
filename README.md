@@ -7,8 +7,8 @@
 [![GoDoc](https://godoc.org/github.com/posener/h2conn?status.svg)](http://godoc.org/github.com/posener/h2conn)
 [![Go Report Card](https://goreportcard.com/badge/github.com/posener/h2conn)](https://goreportcard.com/report/github.com/posener/h2conn)
 
-Get an implementation of [`net.Conn`](https://godoc.org/net#Conn) on both the client and server sides from
-an HTTP2 connection, For easy, full-duplex communication.
+Get a connection object that provides [`io.ReadWriteCloser`](https://golang.org/pkg/io/#ReadWriteCloser)
+interface over an HTTP2 connection, For easy, full-duplex communication.
 
 > * The returned connection does not implement the deadline functions.
 
@@ -29,7 +29,7 @@ Check out the [example](https://github.com/posener/h2conn/tree/master/example) d
 
 ### Server
 
-On the server side, in an implementation of `http.Handler`, the `ht2conn.Upgrade` function
+On the server side, in an implementation of `http.Handler`, the `ht2conn.Accept` function
 can be used to get a full-duplex connection to the client.
 
 
@@ -37,7 +37,7 @@ can be used to get a full-duplex connection to the client.
 type handler struct{}
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	conn, err := h2conn.Upgrade(w, r)
+	conn, err := h2conn.Accept(w, r)
 	if err != nil {
 		log.Printf("Failed creating connection from %s: %s", r.RemoteAddr, err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -51,12 +51,12 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 ### Client
 
-On the client side, the `h2conn.Dial` function can be used in order to connect to an HTTP2 server
+On the client side, the `h2conn.Connect` function can be used in order to connect to an HTTP2 server
 with full-duplex communication.
 
 ```go
 func main() {
-    conn, resp, err := h2conn.Dial(ctx, url, nil)
+    conn, resp, err := h2conn.Connect(ctx, url, nil)
 	if err != nil {
 		log.Fatalf("Initiate conn: %s", err)
 	}
