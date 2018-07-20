@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"net/http"
 	"testing"
-
-	"crypto/tls"
 
 	"github.com/posener/h2conn"
 	"github.com/posener/h2conn/h2test"

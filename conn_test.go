@@ -97,6 +97,11 @@ func TestConcurrent(t *testing.T) {
 }
 
 func TestConn(t *testing.T) {
+	// Only TestConn/BasicIO and TestConn/PingPong currently pass
+	// as they don't test deadlines.
+	// In order to run the tests:
+	// 		1. comment out the `t.Skip(...)` line
+	// 		2. run `go test -race -v -run "TestConn/(BasicIO|PingPong)"`
 	t.Skip("Only TestConn/BasicIO and TestConn/PingPong are passing since there is no deadline support")
 	nettest.TestConn(t, func() (c1 net.Conn, c2 net.Conn, stop func(), err error) {
 		c1, c2, stop, err = makePipe(t)

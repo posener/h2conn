@@ -8,6 +8,8 @@ import (
 
 var ErrHttp2NotSupported = fmt.Errorf("HTTP2 not supported")
 
+// Upgrader can "upgrade" an http2 connection to obtain a net.Conn object
+// for full duplex communication with a client.
 type Upgrader struct {
 	StatusCode int
 }
@@ -43,7 +45,7 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error
 		return nil, ErrHttp2NotSupported
 	}
 
-	c := newConn(r.Context(), r.Body, &writer{w: w, f: flusher}, r.Host, r.RemoteAddr)
+	c := newConn(r.Context(), r.Body, &flushWrite{w: w, f: flusher}, r.Host, r.RemoteAddr)
 
 	w.WriteHeader(u.StatusCode)
 	flusher.Flush()
@@ -51,18 +53,17 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error
 	return c, nil
 }
 
-type writer struct {
+type flushWrite struct {
 	w io.Writer
 	f http.Flusher
 }
 
-func (w *writer) Write(data []byte) (int, error) {
+func (w *flushWrite) Write(data []byte) (int, error) {
 	n, err := w.w.Write(data)
 	w.f.Flush()
 	return n, err
 }
 
-func (w *writer) Close() error {
-	// TODO: implement close
+func (w *flushWrite) Close() error {
 	return nil
 }
