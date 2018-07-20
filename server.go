@@ -6,7 +6,10 @@ import (
 	"net/http"
 )
 
-var ErrHttp2NotSupported = fmt.Errorf("HTTP2 not supported")
+// ErrHTTP2NotSupported is returned by Upgrade if the client connection does not
+// support HTTP2 connection.
+// The server than can response to the client with an HTTP1.1 as he wishes.
+var ErrHTTP2NotSupported = fmt.Errorf("HTTP2 not supported")
 
 // Upgrader can "upgrade" an http2 connection to obtain a net.Conn object
 // for full duplex communication with a client.
@@ -25,7 +28,7 @@ func Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 // Upgrade is used on a server http.Handler.
 // It handles a request and "upgrade" the request connection to a websocket-like
 // full-duplex communication.
-// If the client does not support HTTP2, an ErrHttp2NotSupported is returned.
+// If the client does not support HTTP2, an ErrHTTP2NotSupported is returned.
 //
 // Usage:
 //
@@ -42,7 +45,7 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		return nil, ErrHttp2NotSupported
+		return nil, ErrHTTP2NotSupported
 	}
 
 	c := newConn(r.Context(), r.Body, &flushWrite{w: w, f: flusher}, r.Host, r.RemoteAddr)

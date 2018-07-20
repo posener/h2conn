@@ -8,10 +8,13 @@ import (
 	"golang.org/x/net/http2"
 )
 
+// Dialer enables dial with special arguments
 type Dialer struct {
 	// Method sets the HTTP method for the dial
 	// The default method, if not set, is HTTP CONNECT.
 	Method string
+	// Client is a custom HTTP client to be used for the connection.
+	// The client must have an http2.Transport as it's transport.
 	Client *http.Client
 }
 
