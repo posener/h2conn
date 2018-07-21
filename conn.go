@@ -2,10 +2,8 @@ package h2conn
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"sync"
-	"time"
 )
 
 // Conn is client/server symmetric connection.
@@ -59,10 +57,4 @@ func (c *Conn) Read(data []byte) (int, error) {
 func (c *Conn) Close() error {
 	c.cancel()
 	return c.wc.Close()
-}
-
-// SetWriteDeadLine sets write deadline for the connection
-// it is currently not supported
-func (c *Conn) SetWriteDeadline(t time.Time) error {
-	return fmt.Errorf("deadline not supported")
 }

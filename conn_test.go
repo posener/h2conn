@@ -8,11 +8,10 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"testing"
 	"time"
-
-	"os"
 
 	"github.com/posener/h2conn/h2test"
 	"github.com/stretchr/testify/assert"
@@ -158,6 +157,10 @@ func (c connWrapper) RemoteAddr() net.Addr {
 }
 
 func (c connWrapper) SetDeadline(t time.Time) error {
+	panic("not implemented")
+}
+
+func (c connWrapper) SetWriteDeadline(t time.Time) error {
 	panic("not implemented")
 }
 
