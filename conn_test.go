@@ -25,6 +25,12 @@ const (
 	shortDuration = 100 * time.Millisecond
 )
 
+var insecureClient = Client{
+	Client: &http.Client{
+		Transport: &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+	},
+}
+
 // TestConcurrent runs a simple test of concurrent reads and writes on an HTTP2 full duplex connection
 func TestConcurrent(t *testing.T) {
 	t.Parallel()
@@ -58,13 +64,7 @@ func TestConcurrent(t *testing.T) {
 	}))
 	defer server.Close()
 
-	d := &Client{
-		Client: &http.Client{
-			Transport: &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
-		},
-	}
-
-	clientConn, resp, err := d.Connect(context.Background(), server.URL)
+	clientConn, resp, err := insecureClient.Connect(context.Background(), server.URL)
 	require.Nil(t, err)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -126,13 +126,7 @@ func makePipe(t *testing.T) (net.Conn, net.Conn, func(), error) {
 		<-serverConn.Done()
 	}))
 
-	d := &Client{
-		Client: &http.Client{
-			Transport: &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
-		},
-	}
-
-	clientConn, resp, err := d.Connect(ctx, server.URL)
+	clientConn, resp, err := insecureClient.Connect(ctx, server.URL)
 	require.Nil(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
