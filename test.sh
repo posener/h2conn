@@ -2,11 +2,16 @@
 
 set -e
 
-COVER_FLAGS=""
 if [ -v COVER ]
 then
     echo "Running tests with coverage"
-    COVER_FLAGS="-coverprofile=/tmp/coverage.txt -covermode=atomic"
+    FLAGS="${FLAGS} -coverprofile=/tmp/coverage.txt -covermode=atomic"
+fi
+
+if [ -v RACE ]
+then
+    echo "Running tests with race"
+    FLAGS="${FLAGS} -race"
 fi
 
 function append-coverage {
@@ -19,9 +24,9 @@ function append-coverage {
 rm -f coverage.txt /tmp/coverage.txt
 
 # Run all tests in package
-go test -race ${COVER_FLAGS} ./...
+go test ${FLAGS} ./...
 append-coverage
 
 # Run only passing netconn.TestConn tests
-TEST_CONN=1 go test -race -run "TestConn/(BasicIO|PingPong)" ${COVER_FLAGS}
+TEST_CONN=1 go test -run "TestConn/(BasicIO|PingPong)" ${FLAGS}
 append-coverage

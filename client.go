@@ -11,7 +11,7 @@ import (
 // Client provides HTTP2 client side connection with special arguments
 type Client struct {
 	// Method sets the HTTP method for the dial
-	// The default method, if not set, is HTTP CONNECT.
+	// The default method, if not set, is HTTP POST.
 	Method string
 	// Header enables sending custom headers to the server
 	Header http.Header
@@ -21,7 +21,7 @@ type Client struct {
 }
 
 var defaultClient = Client{
-	Method: http.MethodConnect,
+	Method: http.MethodPost,
 	Client: &http.Client{Transport: &http2.Transport{}},
 }
 
@@ -44,27 +44,27 @@ func Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) 
 //
 //      // use conn
 //
-func (d *Client) Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) {
-	pr, pw := io.Pipe()
+func (c *Client) Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) {
+	reader, writer := io.Pipe()
 
 	// Create a request object to send to the server
-	req, err := http.NewRequest(d.Method, urlStr, pr)
+	req, err := http.NewRequest(c.Method, urlStr, reader)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Apply custom headers
-	if d.Header != nil {
-		req.Header = d.Header
+	if c.Header != nil {
+		req.Header = c.Header
 	}
 
 	// apply given context to the sent request
 	req = req.WithContext(ctx)
 
-	resp, err := d.Client.Do(req)
+	resp, err := c.Client.Do(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return newConn(req.Context(), resp.Body, pw), resp, nil
+	return newConn(req.Context(), resp.Body, writer), resp, nil
 }
