@@ -11,7 +11,7 @@ import (
 // Client provides HTTP2 client side connection with special arguments
 type Client struct {
 	// Method sets the HTTP method for the dial
-	// The default method, if not set, is HTTP CONNECT.
+	// The default method, if not set, is HTTP POST.
 	Method string
 	// Header enables sending custom headers to the server
 	Header http.Header
@@ -21,7 +21,7 @@ type Client struct {
 }
 
 var defaultClient = Client{
-	Method: http.MethodConnect,
+	Method: http.MethodPost,
 	Client: &http.Client{Transport: &http2.Transport{}},
 }
 
