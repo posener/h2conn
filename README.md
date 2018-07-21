@@ -27,7 +27,7 @@ Check out the [example](https://github.com/posener/h2conn/tree/master/example) d
 
 ### Server
 
-On the server side, in an implementation of `http.Handler`, the `ht2conn.Accept` function
+On the server side, in an implementation of `http.Handler`, the `h2conn.Accept` function
 can be used to get a full-duplex connection to the client.
 
 
@@ -41,9 +41,9 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	defer conn.Close()
-
-    // Use conn...
+	defer conn.Close() 
+	
+	// Use conn...
 }
 ```
 
