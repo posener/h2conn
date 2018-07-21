@@ -10,8 +10,6 @@
 Get a connection object that provides [`io.ReadWriteCloser`](https://golang.org/pkg/io/#ReadWriteCloser)
 interface over an HTTP2 connection, For easy, full-duplex communication.
 
-> * The returned connection does not implement the deadline functions.
-
 ## Motivation
 
 Go has a wonderful HTTP2 support that is integrated seamlessly into the HTTP1.1 implementation.
