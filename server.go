@@ -42,7 +42,9 @@ func Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 //          // use conn
 //      }
 func (u *Server) Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
-
+	if !r.ProtoAtLeast(2, 0) {
+		return nil, ErrHTTP2NotSupported
+	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return nil, ErrHTTP2NotSupported
