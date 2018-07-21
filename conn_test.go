@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
@@ -22,7 +23,7 @@ import (
 
 const (
 	numRequests   = 100
-	shortDuration = 100 * time.Millisecond
+	shortDuration = 300 * time.Millisecond
 )
 
 var insecureClient = Client{
@@ -98,6 +99,123 @@ func TestConcurrent(t *testing.T) {
 	case <-time.After(shortDuration):
 		t.Fatalf("Server not done after %s", shortDuration)
 	}
+}
+
+func TestSpecialCases(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		server  func(*testing.T) *httptest.Server
+		client  func() *Client
+		wantErr bool
+	}{
+		{
+			name:   "insecure transport",
+			server: nopHandler,
+			client: func() *Client {
+				return &Client{Client: &http.Client{Transport: &http2.Transport{}}}
+			},
+			wantErr: true,
+		},
+		{
+			name:   "invalid request",
+			server: nopHandler,
+			client: func() *Client {
+				cl := insecureClient
+				cl.Method = "\n"
+				return &cl
+			},
+			wantErr: true,
+		},
+		{
+			name: "headers",
+			client: func() *Client {
+				cl := insecureClient
+				cl.Header = http.Header{"Foo": []string{"bar"}}
+				return &cl
+			},
+			server: func(*testing.T) *httptest.Server {
+				return h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, err := Accept(w, r)
+					require.NoError(t, err)
+					assert.Equal(t, "bar", r.Header.Get("Foo"))
+				}))
+			},
+		},
+		{
+			name: "server use http1",
+			server: func(*testing.T) *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, err := Accept(w, r)
+					assert.Error(t, err)
+				}))
+			},
+			wantErr: true,
+		},
+		{
+			name: "server and client use http1",
+			client: func() *Client {
+				return &Client{Client: &http.Client{
+					// Timeout must be set, otherwise the client hangs because of an open client writer.
+					Timeout: shortDuration,
+				}}
+			},
+			server: func(*testing.T) *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, err := Accept(w, r)
+					assert.Error(t, err)
+				}))
+			},
+			wantErr: true,
+		},
+		{
+			name: "client use http1 transport",
+			client: func() *Client {
+				return &Client{Client: &http.Client{
+					Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+					// Timeout must be set, otherwise the client hangs because of an open client writer.
+					Timeout: shortDuration,
+				}}
+			},
+			server: func(*testing.T) *httptest.Server {
+				return h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, err := Accept(w, r)
+					assert.Error(t, err)
+				}))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			server := tt.server(t)
+			defer server.Close()
+
+			cl := &insecureClient
+			if tt.client != nil {
+				cl = tt.client()
+			}
+
+			conn, resp, err := cl.Connect(context.Background(), server.URL)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			conn.Close()
+		})
+	}
+}
+
+func nopHandler(t *testing.T) *httptest.Server {
+	return h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := Accept(w, r)
+		require.NoError(t, err)
+	}))
 }
 
 // TestConn runs the nettest.TestConn on a pipe between an HTTP2 server and client
