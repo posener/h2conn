@@ -44,27 +44,27 @@ func Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) 
 //
 //      // use conn
 //
-func (d *Client) Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) {
-	pr, pw := io.Pipe()
+func (c *Client) Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) {
+	reader, writer := io.Pipe()
 
 	// Create a request object to send to the server
-	req, err := http.NewRequest(d.Method, urlStr, pr)
+	req, err := http.NewRequest(c.Method, urlStr, reader)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Apply custom headers
-	if d.Header != nil {
-		req.Header = d.Header
+	if c.Header != nil {
+		req.Header = c.Header
 	}
 
 	// apply given context to the sent request
 	req = req.WithContext(ctx)
 
-	resp, err := d.Client.Do(req)
+	resp, err := c.Client.Do(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return newConn(req.Context(), resp.Body, pw), resp, nil
+	return newConn(req.Context(), resp.Body, writer), resp, nil
 }
