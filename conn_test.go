@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"io"
+
 	"github.com/posener/h2conn/h2test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,6 +96,100 @@ func TestConcurrent(t *testing.T) {
 
 	// test that server is closing the connection
 	clientConn.Close()
+	select {
+	case <-serverConn.Done():
+	case <-time.After(shortDuration):
+		t.Fatalf("Server not done after %s", shortDuration)
+	}
+}
+
+// TestClientClose tests that server gets io.EOF after client is closing the connection
+func TestClientClose(t *testing.T) {
+	t.Parallel()
+
+	var (
+		serverConn        *Conn
+		serverHandlerWait = make(chan struct{})
+		serverAccepted    = make(chan struct{})
+	)
+
+	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		serverConn, err = Accept(w, r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		close(serverAccepted)
+		<-serverHandlerWait
+	}))
+	defer server.Close()
+
+	clientConn, resp, err := insecureClient.Connect(context.Background(), server.URL)
+	require.Nil(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// close client connection
+	clientConn.Close()
+
+	<-serverAccepted
+
+	// test that read from server returns an io.EOF error
+	var buf = make([]byte, 100)
+	n, err := serverConn.Read(buf)
+	assert.Equal(t, io.EOF, err)
+	assert.Equal(t, 0, n)
+
+	// release the server handler wait test that server is closing the connection
+	close(serverHandlerWait)
+	select {
+	case <-serverConn.Done():
+	case <-time.After(shortDuration):
+		t.Fatalf("Server not done after %s", shortDuration)
+	}
+}
+
+// TestClientClose tests that server gets io.EOF after client is closing the connection
+func TestServerClose(t *testing.T) {
+	t.Parallel()
+
+	var (
+		serverConn        *Conn
+		serverHandlerWait = make(chan struct{})
+		serverAccepted    = make(chan struct{})
+	)
+
+	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		serverConn, err = Accept(w, r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		close(serverAccepted)
+		<-serverHandlerWait
+	}))
+	defer server.Close()
+
+	clientConn, resp, err := insecureClient.Connect(context.Background(), server.URL)
+	require.Nil(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	<-serverAccepted
+
+	// close server connection
+	serverConn.Close()
+	close(serverHandlerWait)
+
+	// test that read from server returns an io.EOF error
+	var buf = make([]byte, 100)
+	n, err := clientConn.Read(buf)
+	assert.Equal(t, io.EOF, err)
+	assert.Equal(t, 0, n)
+
+	// release the server handler wait test that server is closing the connection
 	select {
 	case <-serverConn.Done():
 	case <-time.After(shortDuration):

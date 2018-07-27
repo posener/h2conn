@@ -28,6 +28,7 @@ func Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 // Accept is used on a server http.Handler.
 // It handles a request and "upgrade" the request connection to a websocket-like
 // full-duplex communication.
+// The server connection will be closed when the http handler function will return.
 // If the client does not support HTTP2, an ErrHTTP2NotSupported is returned.
 //
 // Usage:
