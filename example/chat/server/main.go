@@ -33,13 +33,11 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// Conn has a RemoteAddr property which helps us identify the client
-	log := logger{remoteAddr: r.RemoteAddr}
-
 	var (
-		// in and out send and receive json messages to the server
-		in  = json.NewDecoder(conn)
-		out = json.NewEncoder(conn)
+		// in and out send and receive json messages to the client
+		in, out = conn.JSON()
+		// Conn has a RemoteAddr property which helps us identify the client
+		log = logger{remoteAddr: r.RemoteAddr}
 	)
 
 	// First check user login name

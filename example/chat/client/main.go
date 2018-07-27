@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -47,11 +46,8 @@ func main() {
 	name, _ := nameReader.ReadString('\n')
 	name = strings.TrimRight(name, "\n")
 
-	var (
-		// in and out send and receive json messages to the server
-		in  = json.NewDecoder(conn)
-		out = json.NewEncoder(conn)
-	)
+	// in and out send and receive json messages to the server
+	var in, out = conn.JSON()
 
 	// Send login request
 	err = out.Encode(name)
