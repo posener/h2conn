@@ -47,7 +47,7 @@ func main() {
 	name = strings.TrimRight(name, "\n")
 
 	// in and out send and receive json messages to the server
-	var in, out = conn.JSON()
+	var in, out = conn.GOB()
 
 	// Send login request
 	err = out.Encode(name)

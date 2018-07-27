@@ -314,6 +314,70 @@ func nopHandler(t *testing.T) *httptest.Server {
 	}))
 }
 
+func TestFormatters(t *testing.T) {
+	t.Parallel()
+
+	var (
+		serverConn        *Conn
+		serverHandlerWait = make(chan struct{})
+		serverAccepted    = make(chan struct{})
+	)
+
+	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		serverConn, err = Accept(w, r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		close(serverAccepted)
+		<-serverHandlerWait
+	}))
+	defer server.Close()
+
+	clientConn, resp, err := insecureClient.Connect(context.Background(), server.URL)
+	require.Nil(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	<-serverAccepted
+
+	var answer int
+
+	serverJSONIn, serverJSONOut := serverConn.JSON()
+	clientJSONIn, clientJSONOut := clientConn.JSON()
+
+	serverGOBIn, serverGOBOut := serverConn.GOB()
+	clientGOBIn, clientGOBOut := clientConn.GOB()
+
+	require.NoError(t, serverJSONOut.Encode(1))
+	require.NoError(t, clientJSONIn.Decode(&answer))
+	assert.Equal(t, 1, answer)
+
+	require.NoError(t, clientJSONOut.Encode(2))
+	require.NoError(t, serverJSONIn.Decode(&answer))
+	assert.Equal(t, 2, answer)
+
+	require.NoError(t, serverGOBOut.Encode(3))
+	require.NoError(t, clientGOBIn.Decode(&answer))
+	assert.Equal(t, 3, answer)
+
+	require.NoError(t, clientGOBOut.Encode(4))
+	require.NoError(t, serverGOBIn.Decode(&answer))
+	assert.Equal(t, 4, answer)
+
+	// close server connection
+	serverConn.Close()
+	close(serverHandlerWait)
+
+	// release the server handler wait test that server is closing the connection
+	select {
+	case <-serverConn.Done():
+	case <-time.After(shortDuration):
+		t.Fatalf("Server not done after %s", shortDuration)
+	}
+}
+
 // TestConn runs the nettest.TestConn on a pipe between an HTTP2 server and client
 func TestConn(t *testing.T) {
 	// Only TestConn/BasicIO and TestConn/PingPong currently pass

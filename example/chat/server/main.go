@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,16 +11,20 @@ import (
 	"github.com/posener/h2conn/example/chat"
 )
 
-func main() {
-	c := server{conns: make(map[string]*json.Encoder)}
-	srv := &http.Server{Addr: ":8000", Handler: &c}
-	log.Printf("Serving on http://0.0.0.0:8000")
-	log.Fatal(srv.ListenAndServeTLS("server.crt", "server.key"))
+type encoder interface {
+	Encode(interface{}) error
 }
 
 type server struct {
-	conns map[string]*json.Encoder
+	conns map[string]encoder
 	lock  sync.RWMutex
+}
+
+func main() {
+	c := server{conns: make(map[string]encoder)}
+	srv := &http.Server{Addr: ":8000", Handler: &c}
+	log.Printf("Serving on http://0.0.0.0:8000")
+	log.Fatal(srv.ListenAndServeTLS("server.crt", "server.key"))
 }
 
 func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +38,7 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var (
 		// in and out send and receive json messages to the client
-		in, out = conn.JSON()
+		in, out = conn.GOB()
 		// Conn has a RemoteAddr property which helps us identify the client
 		log = logger{remoteAddr: r.RemoteAddr}
 	)
@@ -89,7 +92,7 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (c *server) login(name string, enc *json.Encoder) error {
+func (c *server) login(name string, enc encoder) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -113,7 +116,7 @@ func (c *server) post(name string, post chat.Post) {
 	var wg sync.WaitGroup
 	wg.Add(len(c.conns))
 	for dstName, dst := range c.conns {
-		go func(dstName string, dst *json.Encoder) {
+		go func(dstName string, dst encoder) {
 			log.Printf("Writing to %s", dstName)
 			err := dst.Encode(&post)
 			if err != nil {

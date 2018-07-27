@@ -2,6 +2,7 @@ package h2conn
 
 import (
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"io"
 	"sync"
@@ -63,6 +64,7 @@ func (c *Conn) Close() error {
 // JSON returns a json encoder and decoder to talk with JSON messages.
 // The usage is the same in the client side and in the server side.
 // Any type can be sent over the json format, here an example of communicating with string.
+// It is important that the client and the server will communicate with the same format
 //
 // Usage:
 //
@@ -78,4 +80,25 @@ func (c *Conn) Close() error {
 //
 func (c *Conn) JSON() (*json.Decoder, *json.Encoder) {
 	return json.NewDecoder(c), json.NewEncoder(c)
+}
+
+// GOB returns a GOB format encoder and decoder to talk with GOB messages.
+// The usage is the same in the client side and in the server side.
+// Any type can be sent over the GOB format, here an example of communicating with string.
+// It is important that the client and the server will communicate with the same format
+//
+// Usage:
+//
+//		// in receives data from the other side, out sends data to the other side.
+//		in, out = conn.GOB()
+//
+//		err = out.Encode("hello")
+//		// handler err
+//
+//		var resp string
+//		err = in.Decode(&resp)
+//		// handle err
+//
+func (c *Conn) GOB() (*gob.Decoder, *gob.Encoder) {
+	return gob.NewDecoder(c), gob.NewEncoder(c)
 }
