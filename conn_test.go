@@ -103,7 +103,7 @@ func TestConcurrent(t *testing.T) {
 	}
 }
 
-// TestClientClose tests that server gets io.EOF after client is closing the connection
+// TestClientClose tests that server gets io.EOF after client closed the connection
 func TestClientClose(t *testing.T) {
 	t.Parallel()
 
@@ -150,7 +150,7 @@ func TestClientClose(t *testing.T) {
 	}
 }
 
-// TestClientClose tests that server gets io.EOF after client is closing the connection
+// TestServer tests that client gets io.EOF after server closed the connection
 func TestServerClose(t *testing.T) {
 	t.Parallel()
 
