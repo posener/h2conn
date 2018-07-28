@@ -76,7 +76,9 @@ func main() {
 The server and the client need to decide on message format.
 Here are few examples that demonstrate how the client and server can communicate over the created pipe.
 
-#### 1. Sending and receiving **JSON** format is a very common thing to do:
+#### 1. JSON
+
+Sending and receiving JSON format is a very common thing to do.
 
 ```go
 import "encoding/json"
@@ -87,25 +89,27 @@ func main() {
 	// Create an encoder and decoder from the connection
 	var in, out = json.NewDecoder(conn), json.NewEncoder(conn)
 	
-    // Sending data into the connection using the out encoder.	
-    // Any type can be sent - the important thing is that the other side will read with a
-    // variable of the same type.
-    // In this case, we just use a simple string.
+	// Sending data into the connection using the out encoder.	
+	// Any type can be sent - the important thing is that the other side will read with a
+	// variable of the same type.
+	// In this case, we just use a simple string.
 	err = out.Encode("hello")
 	// [ handle err ... ]
 	
 	// Receiving data from the connection using the in decoder and a variable.
-    // Any type can be received - the important thing is that the other side will write data
-    // to the connection of the same type.
-    // In this case we assume that the other side sent us a string.
+	// Any type can be received - the important thing is that the other side will write data
+	// to the connection of the same type.
+	// In this case we assume that the other side sent us a string.
 	var resp string
-    err = in.Decode(&resp)	
-    // [ handle err, use resp ... ]
+	err = in.Decode(&resp)	
+	// [ handle err, use resp ... ]
 }
 ```
 
-#### 2. **GOB** is more efficient message format, but requires both client and server to be written in Go.
-   The example is exactly the same as in the json encoding, just switch `json` with `gob`.
+#### 2. GOB 
+
+GOB is more efficient message format, but requires both client and server to be written in Go.
+The example is exactly the same as in the json encoding, just switch `json` with `gob`.
 
 ```go
 import "encoding/gob"
@@ -115,24 +119,24 @@ func main() {
 	
 	var in, out = gob.NewDecoder(conn), gob.NewEncoder(conn)
 	
-    // Sending data into the connection using the out encoder.	
-    // Any type can be sent - the important thing is that the other side will read with a
-    // variable of the same type.
-    // In this case, we just use a simple string.
+	// Sending data into the connection using the out encoder.	
+	// Any type can be sent - the important thing is that the other side will read with a
+	// variable of the same type.
+	// In this case, we just use a simple string.
 	err = out.Encode("hello")
 	// [ handle err ... ]
 	
 	// Receiving data from the connection using the in decoder and a variable.
-    // Any type can be received - the important thing is that the other side will write data
-    // to the connection of the same type.
-    // In this case we assume that the other side sent us a string.
+	// Any type can be received - the important thing is that the other side will write data
+	// to the connection of the same type.
+	// In this case we assume that the other side sent us a string.
 	var resp string
-    err = in.Decode(&resp)	
-    // [ handle err, use resp ... ]
+	err = in.Decode(&resp)	
+	// [ handle err, use resp ... ]
 }
 ```
 
-#### 3. Simple constant read and write buffer size can be used.
+#### 3. Constant Buffer Size
 
 ```go
 // Create constant size buffer
@@ -141,15 +145,14 @@ const bufSize = 10
 func main () {
 	// [ Create a connection ... ]
 	
-    buf := make([]byte, bufSize)
+	buf := make([]byte, bufSize)
 
-    // Write to the connection:
-    // [ Write something to buf... ]
-    _, err = conn.Write(buf)
+	// Write to the connection:
+	// [ Write something to buf... ]
+	_, err = conn.Write(buf)
 
-    // Read from the connection:
-    _, err = conn.Read(buf)
-    // [ Use buf... ]
+	// Read from the connection:
+	_, err = conn.Read(buf)
+	// [ Use buf... ]
 }
 ```
-
