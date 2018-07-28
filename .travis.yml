@@ -4,8 +4,7 @@ go:
   - 1.10.x
 
 env:
-  - COVER=1
-  - RACE=1
+  - COVER=1 RACE=1
 
 before_install:
   - go get -u -t ./...
