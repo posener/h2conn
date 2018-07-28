@@ -5,25 +5,20 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/gob"
+	"encoding/json"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"sync"
 	"testing"
 	"time"
-
-	"encoding/json"
-
-	"encoding/gob"
 
 	"github.com/posener/h2conn/h2test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
-	"golang.org/x/net/nettest"
 )
 
 const (
@@ -99,33 +94,14 @@ func TestConcurrent(t *testing.T) {
 
 	// test that server is closing the connection
 	clientConn.Close()
-	select {
-	case <-serverConn.Done():
-	case <-time.After(shortDuration):
-		t.Fatalf("Server not done after %s", shortDuration)
-	}
+	wait(t, serverConn.Done())
 }
 
 // TestClientClose tests that server gets io.EOF after client closed the connection
 func TestClientClose(t *testing.T) {
 	t.Parallel()
 
-	var (
-		serverConn        *Conn
-		serverHandlerWait = make(chan struct{})
-		serverAccepted    = make(chan struct{})
-	)
-
-	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var err error
-		serverConn, err = Accept(w, r)
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-		close(serverAccepted)
-		<-serverHandlerWait
-	}))
+	server, serverAccepted, serverHandlerWait := startServer()
 	defer server.Close()
 
 	clientConn, resp, err := insecureClient.Connect(context.Background(), server.URL)
@@ -133,10 +109,10 @@ func TestClientClose(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
+	serverConn := <-serverAccepted
+
 	// close client connection
 	clientConn.Close()
-
-	<-serverAccepted
 
 	// test that read from server returns an io.EOF error
 	var buf = make([]byte, 100)
@@ -146,33 +122,14 @@ func TestClientClose(t *testing.T) {
 
 	// release the server handler wait test that server is closing the connection
 	close(serverHandlerWait)
-	select {
-	case <-serverConn.Done():
-	case <-time.After(shortDuration):
-		t.Fatalf("Server not done after %s", shortDuration)
-	}
+	wait(t, serverConn.Done())
 }
 
 // TestServer tests that client gets io.EOF after server closed the connection
 func TestServerClose(t *testing.T) {
 	t.Parallel()
 
-	var (
-		serverConn        *Conn
-		serverHandlerWait = make(chan struct{})
-		serverAccepted    = make(chan struct{})
-	)
-
-	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var err error
-		serverConn, err = Accept(w, r)
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-		close(serverAccepted)
-		<-serverHandlerWait
-	}))
+	server, serverAccepted, serverHandlerWait := startServer()
 	defer server.Close()
 
 	clientConn, resp, err := insecureClient.Connect(context.Background(), server.URL)
@@ -180,7 +137,7 @@ func TestServerClose(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	<-serverAccepted
+	serverConn := <-serverAccepted
 
 	// close server connection
 	serverConn.Close()
@@ -192,12 +149,7 @@ func TestServerClose(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 	assert.Equal(t, 0, n)
 
-	// release the server handler wait test that server is closing the connection
-	select {
-	case <-serverConn.Done():
-	case <-time.After(shortDuration):
-		t.Fatalf("Server not done after %s", shortDuration)
-	}
+	wait(t, serverConn.Done())
 }
 
 func TestSpecialCases(t *testing.T) {
@@ -310,33 +262,11 @@ func TestSpecialCases(t *testing.T) {
 	}
 }
 
-func nopHandler(t *testing.T) *httptest.Server {
-	return h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := Accept(w, r)
-		require.NoError(t, err)
-	}))
-}
-
 // TestFormat tests sending JSON and GOB formats over h2conn
 func TestFormat(t *testing.T) {
 	t.Parallel()
 
-	var (
-		serverConn        *Conn
-		serverHandlerWait = make(chan struct{})
-		serverAccepted    = make(chan struct{})
-	)
-
-	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var err error
-		serverConn, err = Accept(w, r)
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-		close(serverAccepted)
-		<-serverHandlerWait
-	}))
+	server, serverAccepted, serverHandlerWait := startServer()
 	defer server.Close()
 
 	clientConn, resp, err := insecureClient.Connect(context.Background(), server.URL)
@@ -344,9 +274,7 @@ func TestFormat(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	<-serverAccepted
-
-	var answer int
+	serverConn := <-serverAccepted
 
 	serverJSONIn, serverJSONOut := json.NewDecoder(serverConn), json.NewEncoder(serverConn)
 	clientJSONIn, clientJSONOut := json.NewDecoder(clientConn), json.NewEncoder(clientConn)
@@ -354,97 +282,57 @@ func TestFormat(t *testing.T) {
 	serverGOBIn, serverGOBOut := gob.NewDecoder(serverConn), gob.NewEncoder(serverConn)
 	clientGOBIn, clientGOBOut := gob.NewDecoder(clientConn), gob.NewEncoder(clientConn)
 
-	require.NoError(t, serverJSONOut.Encode(1))
-	require.NoError(t, clientJSONIn.Decode(&answer))
-	assert.Equal(t, 1, answer)
-
-	require.NoError(t, clientJSONOut.Encode(2))
-	require.NoError(t, serverJSONIn.Decode(&answer))
-	assert.Equal(t, 2, answer)
-
-	require.NoError(t, serverGOBOut.Encode(3))
-	require.NoError(t, clientGOBIn.Decode(&answer))
-	assert.Equal(t, 3, answer)
-
-	require.NoError(t, clientGOBOut.Encode(4))
-	require.NoError(t, serverGOBIn.Decode(&answer))
-	assert.Equal(t, 4, answer)
+	for i, tt := range []struct {
+		encoder interface{ Encode(interface{}) error }
+		decoder interface{ Decode(interface{}) error }
+	}{
+		{encoder: serverJSONOut, decoder: clientJSONIn},
+		{encoder: clientJSONOut, decoder: serverJSONIn},
+		{encoder: serverGOBOut, decoder: clientGOBIn},
+		{encoder: clientGOBOut, decoder: serverGOBIn},
+	} {
+		require.NoError(t, tt.encoder.Encode(i))
+		var answer int
+		require.NoError(t, tt.decoder.Decode(&answer))
+		assert.Equal(t, i, answer)
+	}
 
 	// close server connection
 	serverConn.Close()
 	close(serverHandlerWait)
+	wait(t, serverConn.Done())
+}
 
-	// release the server handler wait test that server is closing the connection
+func startServer() (server *httptest.Server, serverAccepted <-chan *Conn, serverHandlerWait chan<- struct{}) {
+	var (
+		accepted    = make(chan *Conn)
+		handlerWait = make(chan struct{})
+	)
+
+	server = h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverConn, err := Accept(w, r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		accepted <- serverConn
+		<-handlerWait
+	}))
+
+	return server, accepted, handlerWait
+}
+
+func nopHandler(t *testing.T) *httptest.Server {
+	return h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := Accept(w, r)
+		require.NoError(t, err)
+	}))
+}
+
+func wait(t *testing.T, done <-chan struct{}) {
 	select {
-	case <-serverConn.Done():
+	case <-done:
 	case <-time.After(shortDuration):
 		t.Fatalf("Server not done after %s", shortDuration)
 	}
 }
-
-// TestConn runs the nettest.TestConn on a pipe between an HTTP2 server and client
-func TestConn(t *testing.T) {
-	// Only TestConn/BasicIO and TestConn/PingPong currently pass
-	// as they don't test deadlines.
-	// In order to run the tests run:
-	// `TEST_CONN=1 go test -race -v -run "TestConn/(BasicIO|PingPong)"`
-	if os.Getenv("TEST_CONN") == "" {
-		t.Skip("Only TestConn/BasicIO and TestConn/PingPong are passing since there is no deadline support")
-	}
-	nettest.TestConn(t, func() (c1 net.Conn, c2 net.Conn, stop func(), err error) {
-		c1, c2, stop, err = makePipe(t)
-		return
-	})
-}
-
-func makePipe(t *testing.T) (net.Conn, net.Conn, func(), error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	var serverConn *Conn
-
-	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var err error
-		serverConn, err = Accept(w, r)
-		require.Nil(t, err)
-		<-serverConn.Done()
-	}))
-
-	clientConn, resp, err := insecureClient.Connect(ctx, server.URL)
-	require.Nil(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	stop := func() {
-		server.Close()
-		cancel()
-	}
-
-	return connWrapper{Conn: serverConn}, connWrapper{Conn: clientConn}, stop, nil
-}
-
-type connWrapper struct {
-	*Conn
-}
-
-func (c connWrapper) LocalAddr() net.Addr {
-	return mockAddr{}
-}
-
-func (c connWrapper) RemoteAddr() net.Addr {
-	return mockAddr{}
-}
-
-func (c connWrapper) SetDeadline(t time.Time) error {
-	panic("not implemented")
-}
-
-func (c connWrapper) SetWriteDeadline(t time.Time) error {
-	panic("not implemented")
-}
-
-func (c connWrapper) SetReadDeadline(t time.Time) error {
-	panic("not implemented")
-}
-
-type mockAddr struct{}
-
-func (mockAddr) Network() string { return "mock" }
-func (mockAddr) String() string  { return "mock" }

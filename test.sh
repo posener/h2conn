@@ -2,6 +2,8 @@
 
 set -e
 
+FLAGS="-timeout=10s"
+
 if [ -v COVER ]
 then
     echo "Running tests with coverage"
