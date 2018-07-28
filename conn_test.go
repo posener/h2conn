@@ -15,6 +15,10 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
+
+	"encoding/binary"
+
 	"github.com/posener/h2conn/h2test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -282,6 +286,9 @@ func TestFormat(t *testing.T) {
 	serverGOBIn, serverGOBOut := gob.NewDecoder(serverConn), gob.NewEncoder(serverConn)
 	clientGOBIn, clientGOBOut := gob.NewDecoder(clientConn), gob.NewEncoder(clientConn)
 
+	serverConstFormatter := &constLenFormatter{len: 100, rw: serverConn}
+	clientConstFormatter := &constLenFormatter{len: 100, rw: clientConn}
+
 	for i, tt := range []struct {
 		encoder interface{ Encode(interface{}) error }
 		decoder interface{ Decode(interface{}) error }
@@ -290,6 +297,8 @@ func TestFormat(t *testing.T) {
 		{encoder: clientJSONOut, decoder: serverJSONIn},
 		{encoder: serverGOBOut, decoder: clientGOBIn},
 		{encoder: clientGOBOut, decoder: serverGOBIn},
+		{encoder: serverConstFormatter, decoder: clientConstFormatter},
+		{encoder: clientConstFormatter, decoder: serverConstFormatter},
 	} {
 		require.NoError(t, tt.encoder.Encode(i))
 		var answer int
@@ -335,4 +344,39 @@ func wait(t *testing.T, done <-chan struct{}) {
 	case <-time.After(shortDuration):
 		t.Fatalf("Server not done after %s", shortDuration)
 	}
+}
+
+// constLenFormatter is a simple int encoder/decoder that uses reads and writes with constant size.
+type constLenFormatter struct {
+	len int
+	rw  io.ReadWriter
+}
+
+func (f *constLenFormatter) Encode(v interface{}) error {
+	i, ok := v.(int)
+	if !ok {
+		return fmt.Errorf("works only for int")
+	}
+	buf := make([]byte, f.len)
+
+	binary.LittleEndian.PutUint64(buf, uint64(i))
+
+	_, err := f.rw.Write(buf)
+	return err
+}
+
+func (f *constLenFormatter) Decode(v interface{}) error {
+	i, ok := v.(*int)
+	if !ok {
+		return fmt.Errorf("works only for string pointers")
+	}
+	buf := make([]byte, f.len)
+	n, err := f.rw.Read(buf)
+	if err != nil {
+		return err
+	}
+
+	*i = int(binary.LittleEndian.Uint64(buf[:n]))
+
+	return nil
 }
