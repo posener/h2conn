@@ -68,7 +68,7 @@ func main() {
 		log.Fatalf("Bad status code: %d", resp.StatusCode)
 	}
 
-	// Use conn...
+	// [ Use conn ... ]
 }
 ```
 
@@ -119,6 +119,7 @@ func main() {
 	// Receiving data from the connection using the in decoder and a variable.
     // Any type can be received - the important thing is that the other side will write data
     // to the connection of the same type.
+    // In this case we assume that the other side sent us a string.
 	var resp string
     err = in.Decode(&resp)	
     // [ handle err, use resp ... ]
@@ -146,6 +147,7 @@ func main() {
 	// Receiving data from the connection using the in decoder and a variable.
     // Any type can be received - the important thing is that the other side will write data
     // to the connection of the same type.
+    // In this case we assume that the other side sent us a string.
 	var resp string
     err = in.Decode(&resp)	
     // [ handle err, use resp ... ]
