@@ -1,25 +1,24 @@
 # h2conn
 
-`h2conn` is an HTTP2 client-server connection, similar to websockets but over HTTP2.
+`h2conn` provides HTTP2 client-server full-duplex communication connection.
 
 [![Build Status](https://travis-ci.org/posener/h2conn.svg?branch=master)](https://travis-ci.org/posener/h2conn)
 [![codecov](https://codecov.io/gh/posener/h2conn/branch/master/graph/badge.svg)](https://codecov.io/gh/posener/h2conn)
 [![GoDoc](https://godoc.org/github.com/posener/h2conn?status.svg)](http://godoc.org/github.com/posener/h2conn)
 [![Go Report Card](https://goreportcard.com/badge/github.com/posener/h2conn)](https://goreportcard.com/report/github.com/posener/h2conn)
 
-Get a connection object that provides [`io.ReadWriteCloser`](https://golang.org/pkg/io/#ReadWriteCloser)
-interface over an HTTP2 connection, For easy, full-duplex communication.
-
 ## Motivation
 
 Go has a wonderful HTTP2 support that is integrated seamlessly into the HTTP1.1 implementation.
-There is a nice demo on [https://http2.golang.org](https://http2.golang.org) to see it in action.
+There is a nice demo on [https://http2.golang.org](https://http2.golang.org) in which you can see it in action.
 The code for the demo is available [here](https://github.com/golang/net/tree/master/http2/h2demo).
-I was interested how HTTP2 can work with full-duplex communication, Something similar to web-sockets, 
-and saw the [echo handler implementation](https://github.com/golang/net/blob/a680a1efc54dd51c040b3b5ce4939ea3cf2ea0d1/http2/h2demo/h2demo.go#L136-L164),
-And a client implementation for this handler in this [Github issue](https://github.com/golang/go/issues/13444#issuecomment-161115822).
 
-I thought how I can make this easier, and came out with this library.
+I became interested how HTTP2 can work with full-duplex communication, 
+and saw the [echo handler implementation](https://github.com/golang/net/blob/a680a1efc54dd51c040b3b5ce4939ea3cf2ea0d1/http2/h2demo/h2demo.go#L136-L164),
+and a suggested client side implementation for this handler in this
+[Github issue](https://github.com/golang/go/issues/13444#issuecomment-161115822).
+
+This library provides a simpler API for the same sort of "advanced usage" / "low level" / "hard core" implementation.
 
 ## Examples
 
@@ -72,33 +71,12 @@ func main() {
 }
 ```
 
-### Using the connection
+### Using the Connection
 
 The server and the client need to decide on message format.
 Here are few examples that demonstrate how the client and server can communicate over the created pipe.
 
-1. Simple constant read and write buffer size can be used.
-
-```go
-// Create constant size buffer
-const bufSize = 10
-
-func main () {
-	// [ Create a connection ... ]
-	
-    buf := make([]byte, bufSize)
-
-    // Write to the connection:
-    // [ Write something to buf... ]
-    _, err = conn.Write(buf)
-
-    // Read from the connection:
-    _, err = conn.Read(buf)
-    // [ Use buf... ]
-}
-```
-
-2. Sending and receiving JSON format is a very common thing to do:
+#### 1. Sending and receiving **JSON** format is a very common thing to do:
 
 ```go
 import "encoding/json"
@@ -126,7 +104,7 @@ func main() {
 }
 ```
 
-3. GOB is more efficient message format, but requires both client and server to be written in Go.
+#### 2. **GOB** is more efficient message format, but requires both client and server to be written in Go.
    The example is exactly the same as in the json encoding, just switch `json` with `gob`.
 
 ```go
@@ -153,3 +131,25 @@ func main() {
     // [ handle err, use resp ... ]
 }
 ```
+
+#### 3. Simple constant read and write buffer size can be used.
+
+```go
+// Create constant size buffer
+const bufSize = 10
+
+func main () {
+	// [ Create a connection ... ]
+	
+    buf := make([]byte, bufSize)
+
+    // Write to the connection:
+    // [ Write something to buf... ]
+    _, err = conn.Write(buf)
+
+    // Read from the connection:
+    _, err = conn.Read(buf)
+    // [ Use buf... ]
+}
+```
+
