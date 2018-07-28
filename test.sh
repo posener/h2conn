@@ -29,6 +29,6 @@ rm -f coverage.txt /tmp/coverage.txt
 go test ${FLAGS} ./...
 append-coverage
 
-# Run only passing netconn.TestConn tests
-TEST_CONN=1 go test -run "TestConn/(BasicIO|PingPong)" ${FLAGS}
+# Run only passing netconn.TestPipe tests
+TEST_CONN=1 go test -run "TestPipe/(BasicIO|PingPong)" ${FLAGS}
 append-coverage

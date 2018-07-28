@@ -14,14 +14,14 @@ import (
 	"golang.org/x/net/nettest"
 )
 
-// TestConn runs the nettest.TestConn on a pipe between an HTTP2 server and client
-func TestConn(t *testing.T) {
-	// Only TestConn/BasicIO and TestConn/PingPong currently pass
+// TestPipe runs the nettest.TestConn on a pipe between an HTTP2 server and client
+func TestPipe(t *testing.T) {
+	// Only TestPipe/BasicIO and TestPipe/PingPong currently pass
 	// as they don't test deadlines.
 	// In order to run the tests run:
-	// `TEST_CONN=1 go test -race -v -run "TestConn/(BasicIO|PingPong)"`
+	// `TEST_CONN=1 go test -race -v -run "TestPipe/(BasicIO|PingPong)"`
 	if os.Getenv("TEST_CONN") == "" {
-		t.Skip("Only TestConn/BasicIO and TestConn/PingPong are passing since there is no deadline support")
+		t.Skip("Only TestPipe/BasicIO and TestPipe/PingPong are passing since there is no deadline support")
 	}
 	nettest.TestConn(t, func() (c1 net.Conn, c2 net.Conn, stop func(), err error) {
 		c1, c2, stop, err = makePipe(t)
