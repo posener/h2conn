@@ -34,19 +34,23 @@ func TestPipe(t *testing.T) {
 }
 
 func makePipe(t *testing.T) (net.Conn, net.Conn, func(), error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	var serverConn *Conn
+	var (
+		ctx, cancel = context.WithCancel(context.Background())
+		serverCh    = make(chan *Conn)
+	)
 
 	server := h2test.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var err error
-		serverConn, err = Accept(w, r)
+		serverConn, err := Accept(w, r)
 		require.Nil(t, err)
+		serverCh <- serverConn
 		<-r.Context().Done()
 	}))
 
 	clientConn, resp, err := insecureClient.Connect(ctx, server.URL)
 	require.Nil(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	serverConn := <-serverCh
 
 	stop := func() {
 		cancel()
