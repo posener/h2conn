@@ -27,6 +27,10 @@ func TestConn(t *testing.T) {
 		c1, c2, stop, err = makePipe(t)
 		return
 	})
+	nettest.TestConn(t, func() (c1 net.Conn, c2 net.Conn, stop func(), err error) {
+		c2, c1, stop, err = makePipe(t)
+		return
+	})
 }
 
 func makePipe(t *testing.T) (net.Conn, net.Conn, func(), error) {
