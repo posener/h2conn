@@ -30,5 +30,5 @@ go test ${FLAGS} ./...
 append-coverage
 
 # Run only passing netconn.TestPipe tests
-TEST_CONN=1 go test -run "TestPipe/(BasicIO|PingPong)" ${FLAGS}
+TEST_PIPE=1 go test -run "TestPipe/(BasicIO|PingPong)" ${FLAGS}
 append-coverage

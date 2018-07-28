@@ -66,5 +66,6 @@ func (c *Client) Connect(ctx context.Context, urlStr string) (*Conn, *http.Respo
 		return nil, nil, err
 	}
 
-	return newConn(req.Context(), resp.Body, writer), resp, nil
+	conn, _ := newConn(req.Context(), resp.Body, writer)
+	return conn, resp, nil
 }

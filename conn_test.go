@@ -96,9 +96,7 @@ func TestConcurrent(t *testing.T) {
 	}()
 	wg.Wait()
 
-	// test that server is closing the connection
 	clientConn.Close()
-	wait(t, serverConn.Done())
 }
 
 // TestClientClose tests that server gets io.EOF after client closed the connection
@@ -107,6 +105,7 @@ func TestClientClose(t *testing.T) {
 
 	server, serverAccepted, serverHandlerWait := startServer()
 	defer server.Close()
+	defer close(serverHandlerWait)
 
 	clientConn, resp, err := insecureClient.Connect(context.Background(), server.URL)
 	require.Nil(t, err)
@@ -123,10 +122,6 @@ func TestClientClose(t *testing.T) {
 	n, err := serverConn.Read(buf)
 	assert.Equal(t, io.EOF, err)
 	assert.Equal(t, 0, n)
-
-	// release the server handler wait test that server is closing the connection
-	close(serverHandlerWait)
-	wait(t, serverConn.Done())
 }
 
 // TestServer tests that client gets io.EOF after server closed the connection
@@ -152,8 +147,6 @@ func TestServerClose(t *testing.T) {
 	n, err := clientConn.Read(buf)
 	assert.Equal(t, io.EOF, err)
 	assert.Equal(t, 0, n)
-
-	wait(t, serverConn.Done())
 }
 
 func TestSpecialCases(t *testing.T) {
@@ -272,6 +265,7 @@ func TestFormat(t *testing.T) {
 
 	server, serverAccepted, serverHandlerWait := startServer()
 	defer server.Close()
+	defer close(serverHandlerWait)
 
 	clientConn, resp, err := insecureClient.Connect(context.Background(), server.URL)
 	require.Nil(t, err)
@@ -305,11 +299,6 @@ func TestFormat(t *testing.T) {
 		require.NoError(t, tt.decoder.Decode(&answer))
 		assert.Equal(t, i, answer)
 	}
-
-	// close server connection
-	serverConn.Close()
-	close(serverHandlerWait)
-	wait(t, serverConn.Done())
 }
 
 func startServer() (server *httptest.Server, serverAccepted <-chan *Conn, serverHandlerWait chan<- struct{}) {
@@ -336,14 +325,6 @@ func nopHandler(t *testing.T) *httptest.Server {
 		_, err := Accept(w, r)
 		require.NoError(t, err)
 	}))
-}
-
-func wait(t *testing.T, done <-chan struct{}) {
-	select {
-	case <-done:
-	case <-time.After(shortDuration):
-		t.Fatalf("Server not done after %s", shortDuration)
-	}
 }
 
 // constLenFormatter is a simple int encoder/decoder that uses reads and writes with constant size.

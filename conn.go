@@ -13,30 +13,22 @@ type Conn struct {
 	r  io.Reader
 	wc io.WriteCloser
 
-	ctx    context.Context
 	cancel context.CancelFunc
 
 	wLock sync.Mutex
 	rLock sync.Mutex
 }
 
-// Done returns a channel that is closed when the other side closes the connection.
-func (c *Conn) Done() <-chan struct{} {
-	return c.ctx.Done()
-}
-
-func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser) *Conn {
+func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser) (*Conn, context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	c := &Conn{
-		r:  r,
-		wc: wc,
-
-		ctx:    ctx,
+		r:      r,
+		wc:     wc,
 		cancel: cancel,
 	}
 
-	return c
+	return c, ctx
 }
 
 // Write writes data to the connection

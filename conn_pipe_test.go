@@ -19,8 +19,8 @@ func TestPipe(t *testing.T) {
 	// Only TestPipe/BasicIO and TestPipe/PingPong currently pass
 	// as they don't test deadlines.
 	// In order to run the tests run:
-	// `TEST_CONN=1 go test -race -v -run "TestPipe/(BasicIO|PingPong)"`
-	if os.Getenv("TEST_CONN") == "" {
+	// `TEST_PIPE=1 go test -race -v -run "TestPipe/(BasicIO|PingPong)"`
+	if os.Getenv("TEST_PIPE") == "" {
 		t.Skip("Only TestPipe/BasicIO and TestPipe/PingPong are passing since there is no deadline support")
 	}
 	nettest.TestConn(t, func() (c1 net.Conn, c2 net.Conn, stop func(), err error) {
@@ -41,7 +41,7 @@ func makePipe(t *testing.T) (net.Conn, net.Conn, func(), error) {
 		var err error
 		serverConn, err = Accept(w, r)
 		require.Nil(t, err)
-		<-serverConn.Done()
+		<-r.Context().Done()
 	}))
 
 	clientConn, resp, err := insecureClient.Connect(ctx, server.URL)
@@ -49,8 +49,8 @@ func makePipe(t *testing.T) (net.Conn, net.Conn, func(), error) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	stop := func() {
-		server.Close()
 		cancel()
+		server.Close()
 	}
 
 	return connWrapper{Conn: serverConn}, connWrapper{Conn: clientConn}, stop, nil

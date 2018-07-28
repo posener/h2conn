@@ -51,7 +51,11 @@ func (u *Server) Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 		return nil, ErrHTTP2NotSupported
 	}
 
-	c := newConn(r.Context(), r.Body, &flushWrite{w: w, f: flusher})
+	c, ctx := newConn(r.Context(), r.Body, &flushWrite{w: w, f: flusher})
+
+	// Update the request context with the connection context.
+	// If the connection is closed by the server, it will also notify everything that waits on the request context.
+	*r = *r.WithContext(ctx)
 
 	w.WriteHeader(u.StatusCode)
 	flusher.Flush()
@@ -71,5 +75,8 @@ func (w *flushWrite) Write(data []byte) (int, error) {
 }
 
 func (w *flushWrite) Close() error {
+	// Currently server side close of connection is not supported in Go.
+	// The server closes the connection when the http.Handler function returns.
+	// We use connection context and cancel function as a work-around.
 	return nil
 }
