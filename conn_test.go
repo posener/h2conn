@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -14,7 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"io"
+	"encoding/json"
+
+	"encoding/gob"
 
 	"github.com/posener/h2conn/h2test"
 	"github.com/stretchr/testify/assert"
@@ -314,7 +317,8 @@ func nopHandler(t *testing.T) *httptest.Server {
 	}))
 }
 
-func TestFormatters(t *testing.T) {
+// TestFormat tests sending JSON and GOB formats over h2conn
+func TestFormat(t *testing.T) {
 	t.Parallel()
 
 	var (
@@ -344,11 +348,11 @@ func TestFormatters(t *testing.T) {
 
 	var answer int
 
-	serverJSONIn, serverJSONOut := serverConn.JSON()
-	clientJSONIn, clientJSONOut := clientConn.JSON()
+	serverJSONIn, serverJSONOut := json.NewDecoder(serverConn), json.NewEncoder(serverConn)
+	clientJSONIn, clientJSONOut := json.NewDecoder(clientConn), json.NewEncoder(clientConn)
 
-	serverGOBIn, serverGOBOut := serverConn.GOB()
-	clientGOBIn, clientGOBOut := clientConn.GOB()
+	serverGOBIn, serverGOBOut := gob.NewDecoder(serverConn), gob.NewEncoder(serverConn)
+	clientGOBIn, clientGOBOut := gob.NewDecoder(clientConn), gob.NewEncoder(clientConn)
 
 	require.NoError(t, serverJSONOut.Encode(1))
 	require.NoError(t, clientJSONIn.Decode(&answer))

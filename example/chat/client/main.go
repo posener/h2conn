@@ -12,6 +12,8 @@ import (
 
 	"strings"
 
+	"encoding/gob"
+
 	"github.com/marcusolsson/tui-go"
 	"github.com/posener/h2conn"
 	"github.com/posener/h2conn/example/chat"
@@ -46,8 +48,8 @@ func main() {
 	name, _ := nameReader.ReadString('\n')
 	name = strings.TrimRight(name, "\n")
 
-	// in and out send and receive json messages to the server
-	var in, out = conn.GOB()
+	// in and out send and receive GOB messages to the server
+	var in, out = gob.NewDecoder(conn), gob.NewEncoder(conn)
 
 	// Send login request
 	err = out.Encode(name)

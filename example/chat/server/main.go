@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"encoding/gob"
+
 	"github.com/posener/h2conn"
 	"github.com/posener/h2conn/example/chat"
 )
@@ -37,8 +39,8 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	var (
-		// in and out send and receive json messages to the client
-		in, out = conn.GOB()
+		// in and out send and receive GOB messages to the client
+		in, out = gob.NewDecoder(conn), gob.NewEncoder(conn)
 		// Conn has a RemoteAddr property which helps us identify the client
 		log = logger{remoteAddr: r.RemoteAddr}
 	)

@@ -43,7 +43,10 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close() 
 	
-	// Use conn...
+	// [ Use conn ... ]
+	// The connection will be left open until this function will return.
+	// If there is a need to wait to the client to close the connection,
+	// we can wait on the request context: `<-r.Context().Done()`.
 }
 ```
 
@@ -66,5 +69,85 @@ func main() {
 	}
 
 	// Use conn...
+}
+```
+
+### Using the connection
+
+The server and the client need to decide on message format.
+Here are few examples that demonstrate how the client and server can communicate over the created pipe.
+
+1. Simple constant read and write buffer size can be used.
+
+```go
+// Create constant size buffer
+const bufSize = 10
+
+func main () {
+	// [ Create a connection ... ]
+	
+    buf := make([]byte, bufSize)
+
+    // Write to the connection:
+    // [ Write something to buf... ]
+    _, err = conn.Write(buf)
+
+    // Read from the connection:
+    _, err = conn.Read(buf)
+    // [ Use buf... ]
+}
+```
+
+2. Sending and receiving JSON format is a very common thing to do:
+
+```go
+import "encoding/json"
+
+func main() {
+	// [ Create a connection ... ]
+	
+	// Create an encoder and decoder from the connection
+	var in, out = json.NewDecoder(conn), json.NewEncoder(conn)
+	
+    // Sending data into the connection using the out encoder.	
+    // Any type can be sent - the important thing is that the other side will read with a
+    // variable of the same type.
+    // In this case, we just use a simple string.
+	err = out.Encode("hello")
+	// [ handle err ... ]
+	
+	// Receiving data from the connection using the in decoder and a variable.
+    // Any type can be received - the important thing is that the other side will write data
+    // to the connection of the same type.
+	var resp string
+    err = in.Decode(&resp)	
+    // [ handle err, use resp ... ]
+}
+```
+
+3. GOB is more efficient message format, but requires both client and server to be written in Go.
+   The example is exactly the same as in the json encoding, just switch `json` with `gob`.
+
+```go
+import "encoding/gob"
+
+func main() {
+	// [ Create a connection ... ]
+	
+	var in, out = gob.NewDecoder(conn), gob.NewEncoder(conn)
+	
+    // Sending data into the connection using the out encoder.	
+    // Any type can be sent - the important thing is that the other side will read with a
+    // variable of the same type.
+    // In this case, we just use a simple string.
+	err = out.Encode("hello")
+	// [ handle err ... ]
+	
+	// Receiving data from the connection using the in decoder and a variable.
+    // Any type can be received - the important thing is that the other side will write data
+    // to the connection of the same type.
+	var resp string
+    err = in.Decode(&resp)	
+    // [ handle err, use resp ... ]
 }
 ```
