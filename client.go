@@ -61,7 +61,13 @@ func (c *Client) Connect(ctx context.Context, urlStr string) (*Conn, *http.Respo
 	// apply given context to the sent request
 	req = req.WithContext(ctx)
 
-	resp, err := c.Client.Do(req)
+	// If an http client was not defined, use the default http client
+	httpClient := c.Client
+	if httpClient == nil {
+		httpClient = defaultClient.Client
+	}
+
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, nil, err
 	}
