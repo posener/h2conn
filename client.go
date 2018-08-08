@@ -20,13 +20,49 @@ type Client struct {
 	Client *http.Client
 }
 
+// Connect establishes a full duplex communication with an HTTP2 server with custom client.
+// See h2conn.Connect documentation for more info.
+func (c *Client) Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) {
+	reader, writer := io.Pipe()
+
+	// Create a request object to send to the server
+	req, err := http.NewRequest(c.Method, urlStr, reader)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Apply custom headers
+	if c.Header != nil {
+		req.Header = c.Header
+	}
+
+	// Apply given context to the sent request
+	req = req.WithContext(ctx)
+
+	// If an http client was not defined, use the default http client
+	httpClient := c.Client
+	if httpClient == nil {
+		httpClient = defaultClient.Client
+	}
+
+	// Perform the request
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create a connection
+	conn, ctx := newConn(req.Context(), resp.Body, writer)
+
+	// Apply the connection context on the request context
+	resp.Request = req.WithContext(ctx)
+
+	return conn, resp, nil
+}
+
 var defaultClient = Client{
 	Method: http.MethodPost,
 	Client: &http.Client{Transport: &http2.Transport{}},
-}
-
-func Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) {
-	return defaultClient.Connect(ctx, urlStr)
 }
 
 // Connect establishes a full duplex communication with an HTTP2 server.
@@ -44,34 +80,6 @@ func Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) 
 //
 //      // use conn
 //
-func (c *Client) Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) {
-	reader, writer := io.Pipe()
-
-	// Create a request object to send to the server
-	req, err := http.NewRequest(c.Method, urlStr, reader)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Apply custom headers
-	if c.Header != nil {
-		req.Header = c.Header
-	}
-
-	// apply given context to the sent request
-	req = req.WithContext(ctx)
-
-	// If an http client was not defined, use the default http client
-	httpClient := c.Client
-	if httpClient == nil {
-		httpClient = defaultClient.Client
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	conn, _ := newConn(req.Context(), resp.Body, writer)
-	return conn, resp, nil
+func Connect(ctx context.Context, urlStr string) (*Conn, *http.Response, error) {
+	return defaultClient.Connect(ctx, urlStr)
 }

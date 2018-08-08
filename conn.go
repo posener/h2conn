@@ -21,14 +21,11 @@ type Conn struct {
 
 func newConn(ctx context.Context, r io.Reader, wc io.WriteCloser) (*Conn, context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
-
-	c := &Conn{
+	return &Conn{
 		r:      r,
 		wc:     wc,
 		cancel: cancel,
-	}
-
-	return c, ctx
+	}, ctx
 }
 
 // Write writes data to the connection

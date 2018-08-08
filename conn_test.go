@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/binary"
 	"encoding/gob"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -14,10 +16,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"fmt"
-
-	"encoding/binary"
 
 	"github.com/posener/h2conn/h2test"
 	"github.com/stretchr/testify/assert"

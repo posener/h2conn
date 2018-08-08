@@ -17,31 +17,8 @@ type Server struct {
 	StatusCode int
 }
 
-var defaultUpgrader = Server{
-	StatusCode: http.StatusOK,
-}
-
-func Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
-	return defaultUpgrader.Accept(w, r)
-}
-
-// Accept is used on a server http.Handler.
-// It handles a request and "upgrade" the request connection to a websocket-like
-// full-duplex communication.
-// The server connection will be closed when the http handler function will return.
-// If the client does not support HTTP2, an ErrHTTP2NotSupported is returned.
-//
-// Usage:
-//
-//      func (w http.ResponseWriter, r *http.Request) {
-//          conn, err := h2conn.Accept(w, r)
-//          if err != nil {
-//		        log.Printf("Failed creating http2 connection: %s", err)
-//		        http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-//		        return
-//	        }
-//          // use conn
-//      }
+// Accept is used on a server http.Handler to extract a full-duplex communication object with the client.
+// See h2conn.Accept documentation for more info.
 func (u *Server) Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 	if !r.ProtoAtLeast(2, 0) {
 		return nil, ErrHTTP2NotSupported
@@ -61,6 +38,29 @@ func (u *Server) Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 	flusher.Flush()
 
 	return c, nil
+}
+
+var defaultUpgrader = Server{
+	StatusCode: http.StatusOK,
+}
+
+// Accept is used on a server http.Handler to extract a full-duplex communication object with the client.
+// The server connection will be closed when the http handler function will return.
+// If the client does not support HTTP2, an ErrHTTP2NotSupported is returned.
+//
+// Usage:
+//
+//      func (w http.ResponseWriter, r *http.Request) {
+//          conn, err := h2conn.Accept(w, r)
+//          if err != nil {
+//		        log.Printf("Failed creating http2 connection: %s", err)
+//		        http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+//		        return
+//	        }
+//          // use conn
+//      }
+func Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
+	return defaultUpgrader.Accept(w, r)
 }
 
 type flushWrite struct {
