@@ -6,11 +6,9 @@ import (
 	"net/http"
 	"sync"
 	"time"
-
 	"encoding/gob"
 
-	"github.com/posener/h2conn"
-	"github.com/posener/h2conn/example/chat"
+	h2conn "../.."
 )
 
 type encoder interface {
@@ -83,7 +81,7 @@ func (c *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// wait for client to close connection
 	for r.Context().Err() == nil {
-		var post chat.Post
+		var post Post
 		err := in.Decode(&post)
 		if err != nil {
 			log.Printf("Failed getting post: %v", err)
@@ -111,7 +109,7 @@ func (c *server) logout(name string) {
 	delete(c.conns, name)
 }
 
-func (c *server) post(name string, post chat.Post) {
+func (c *server) post(name string, post Post) {
 	post.User = name
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -131,7 +129,7 @@ func (c *server) post(name string, post chat.Post) {
 }
 
 func (c *server) systemMessage(message string) {
-	c.post("System", chat.Post{Message: message, Time: time.Now()})
+	c.post("System", Post{Message: message, Time: time.Now()})
 }
 
 type logger struct {

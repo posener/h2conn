@@ -12,8 +12,9 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/posener/h2conn"
 	"golang.org/x/net/http2"
+
+	h2conn "../.."
 )
 
 const url = "https://localhost:8000"
