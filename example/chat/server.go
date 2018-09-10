@@ -1,12 +1,12 @@
 package main
 
 import (
+	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
 	"sync"
 	"time"
-	"encoding/gob"
 
 	h2conn "../.."
 )
