@@ -1,13 +1,10 @@
 language: go
 sudo: false
 go:
-  - 1.10.x
+  - '1.11.x'
 
 env:
-  - COVER=1 RACE=1
-
-before_install:
-  - go get -u -t ./...
+  - COVER=1 RACE=1 GO111MODULE=on
 
 script:
   - ./test.sh

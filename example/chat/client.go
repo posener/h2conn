@@ -4,19 +4,16 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"encoding/gob"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"time"
-
 	"strings"
-
-	"encoding/gob"
+	"time"
 
 	"github.com/marcusolsson/tui-go"
 	"github.com/posener/h2conn"
-	"github.com/posener/h2conn/example/chat"
 	"golang.org/x/net/http2"
 )
 
@@ -70,7 +67,6 @@ func main() {
 	history := tui.NewVBox()
 
 	historyScroll := tui.NewScrollArea(history)
-	historyScroll.SetAutoscrollToBottom(true)
 
 	historyBox := tui.NewVBox(historyScroll)
 	historyBox.SetBorder(true)
@@ -90,23 +86,19 @@ func main() {
 		if e.Text() == "" {
 			return // Skip empty messages
 		}
-		err := out.Encode(chat.Post{Message: e.Text(), Time: time.Now()})
+		err := out.Encode(Post{Message: e.Text(), Time: time.Now()})
 		if err != nil {
 			log.Fatalf("Failed sending message: %v", err)
 		}
 		input.SetText("")
 	})
 
-	ui, err := tui.New(root)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	ui := tui.New(root)
 	ui.SetKeybinding("Esc", func() { ui.Quit() })
 
 	go func() {
 		for {
-			var post chat.Post
+			var post Post
 			err = in.Decode(&post)
 			if err != nil {
 				log.Fatalf("Failed decoding incoming message %v", err)

@@ -1,13 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-
-	"encoding/json"
-
-	"fmt"
-
 	"strings"
 
 	"github.com/posener/h2conn"
