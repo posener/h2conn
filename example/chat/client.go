@@ -13,9 +13,8 @@ import (
 	"time"
 
 	"github.com/marcusolsson/tui-go"
+	"github.com/posener/h2conn"
 	"golang.org/x/net/http2"
-
-	h2conn "../.."
 )
 
 const url = "https://localhost:8000"
@@ -94,10 +93,7 @@ func main() {
 		input.SetText("")
 	})
 
-	ui, err := tui.New(root)
-	if err != nil {
-		log.Fatal(err)
-	}
+	ui := tui.New(root)
 	ui.SetKeybinding("Esc", func() { ui.Quit() })
 
 	go func() {

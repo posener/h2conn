@@ -1,7 +1,8 @@
 language: go
 sudo: false
 go:
-  - 1.10.x
+  - '1.10.x'
+  - '1.11'
 
 env:
   - COVER=1 RACE=1 GO111MODULE=on
