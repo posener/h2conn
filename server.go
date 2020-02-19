@@ -28,7 +28,7 @@ func (u *Server) Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 		return nil, ErrHTTP2NotSupported
 	}
 
-	c, ctx := newConn(r.Context(), r.Body, &flushWrite{w: w, f: flusher})
+	c, ctx := newConn(r.Context(), r.Body, &flushWrite{w: w, f: flusher, r: r})
 
 	// Update the request context with the connection context.
 	// If the connection is closed by the server, it will also notify everything that waits on the request context.
@@ -66,12 +66,18 @@ func Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 type flushWrite struct {
 	w io.Writer
 	f http.Flusher
+	r *http.Request
 }
 
 func (w *flushWrite) Write(data []byte) (int, error) {
-	n, err := w.w.Write(data)
-	w.f.Flush()
-	return n, err
+	select {
+	case <-w.r.Context().Done():
+		return 0, fmt.Errorf("Cannot write as the connection is lost")
+	default:
+		n, err := w.w.Write(data)
+		w.f.Flush()
+		return n, err
+	}
 }
 
 func (w *flushWrite) Close() error {
