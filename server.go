@@ -1,6 +1,7 @@
 package h2conn
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,7 +29,7 @@ func (u *Server) Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 		return nil, ErrHTTP2NotSupported
 	}
 
-	c, ctx := newConn(r.Context(), r.Body, &flushWrite{w: w, f: flusher, r: r})
+	c, ctx := newConn(r.Context(), r.Body, &flushWrite{w: w, f: flusher, ctx: r.Context()})
 
 	// Update the request context with the connection context.
 	// If the connection is closed by the server, it will also notify everything that waits on the request context.
@@ -53,10 +54,10 @@ var defaultUpgrader = Server{
 //      func (w http.ResponseWriter, r *http.Request) {
 //          conn, err := h2conn.Accept(w, r)
 //          if err != nil {
-//		        log.Printf("Failed creating http2 connection: %s", err)
-//		        http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-//		        return
-//	        }
+//				log.Printf("Failed creating http2 connection: %s", err)
+//				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+//				return
+//			}
 //          // use conn
 //      }
 func Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
@@ -64,20 +65,18 @@ func Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 }
 
 type flushWrite struct {
-	w io.Writer
-	f http.Flusher
-	r *http.Request
+	w   io.Writer
+	f   http.Flusher
+	ctx context.Context
 }
 
 func (w *flushWrite) Write(data []byte) (int, error) {
-	select {
-	case <-w.r.Context().Done():
-		return 0, fmt.Errorf("Cannot write as the connection is lost")
-	default:
-		n, err := w.w.Write(data)
-		w.f.Flush()
-		return n, err
+	if w.ctx.Err() != nil {
+		return 0, w.ctx.Err()
 	}
+	n, err := w.w.Write(data)
+	w.f.Flush()
+	return n, err
 }
 
 func (w *flushWrite) Close() error {
